@@ -12,7 +12,7 @@
 
 #### MODIFICATION TO ORIGINAL LICENSE ####
 # Heavy modifications to make this more idiomatic by Duncan Townsend.
-# KeccakRandom and KeccakCipher written by Duncan Townsend.
+# HMAC_Keccak, KeccakRandom, and KeccakCipher written by Duncan Townsend.
 #
 # These modifications are available under the same license as the rest of this
 # project
@@ -531,6 +531,19 @@ class Keccak(object):
             setattr(self, k, v)
 
 
+def HMAC_Keccak(key, data=None, length=None, r=1024, c=576):
+    if (length is None) ^ (data is None):
+        raise ValueError("Both or neither of arguments length and data must be supplied")
+    if length is None:
+        k = Keccak(r=r, c=c, fixed_out=False, duplex=False, verbose=False)
+        k.absorb(k.pad10star1(key+'\x01', r))
+        return k
+    else:
+        k = Keccak(r=r, c=c, fixed_out=True, duplex=False, verbose=False)
+        k.absorb(k.pad10star1(key+'\x01', r))
+        return k.squeeze(length)
+
+
 try:
     from correct_random import CorrectRandom as random_base
 except ImportError:
@@ -791,4 +804,4 @@ class KeccakCipher(object):
             self.last_block = None
             raise ValueError('MAC did not match')
 
-__all__ = ['Keccak', 'KeccakError', 'KeccakRandom', 'KeccakCipher']
+__all__ = ['Keccak', 'HMAC_Keccak', 'KeccakError', 'KeccakRandom', 'KeccakCipher']
