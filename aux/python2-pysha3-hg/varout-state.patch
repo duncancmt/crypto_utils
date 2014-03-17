@@ -1,0 +1,135 @@
+--- a/Modules/_sha3/sha3module.c	Wed Jul 31 13:33:01 2013 +0200
++++ b/Modules/_sha3/sha3module.c	Wed Sep 11 12:44:37 2013 -0400
+@@ -267,15 +267,17 @@
+     SHA3_state temp;
+     HashReturn res;
+ 
+-    ENTER_HASHLIB(self);
+-    SHA3_copystate(temp, self->hash_state);
+-    LEAVE_HASHLIB(self);
+     if (self->hashbitlen) {
++        ENTER_HASHLIB(self);
++        SHA3_copystate(temp, self->hash_state);
++        LEAVE_HASHLIB(self);
+         res = SHA3_done(&temp, digest);
++        SHA3_clearstate(temp);
+     } else {
+-       res = SHA3_squeeze(&temp, digest, self->digestlen * 8);
++        ENTER_HASHLIB(self);
++        res = SHA3_squeeze(&self->hash_state, digest, self->digestlen * 8);
++        LEAVE_HASHLIB(self);
+     }
+-    SHA3_clearstate(temp);
+     if (res != SUCCESS) {
+         PyErr_SetString(PyExc_RuntimeError, "internal error in SHA3 Final()");
+         return NULL;
+@@ -362,15 +364,17 @@
+     HashReturn res;
+ 
+     /* Get the raw (binary) digest value */
+-    ENTER_HASHLIB(self);
+-    SHA3_copystate(temp, self->hash_state);
+-    LEAVE_HASHLIB(self);
+     if (self->hashbitlen) {
++        ENTER_HASHLIB(self);
++        SHA3_copystate(temp, self->hash_state);
++        LEAVE_HASHLIB(self);
+         res = SHA3_done(&temp, digest);
++        SHA3_clearstate(temp);
+     } else {
+-       res = SHA3_squeeze(&temp, digest, self->digestlen * 8);
++        ENTER_HASHLIB(self);
++        res = SHA3_squeeze(&self->hash_state, digest, self->digestlen * 8);
++        LEAVE_HASHLIB(self);
+     }
+-    SHA3_clearstate(temp);
+     if (res != SUCCESS) {
+         PyErr_SetString(PyExc_RuntimeError, "internal error in SHA3 Final()");
+         return NULL;
+@@ -407,11 +411,17 @@
+     }
+ 
+     /* Get the raw (binary) digest value */
+-    ENTER_HASHLIB(self);
+-    SHA3_copystate(temp, self->hash_state);
+-    LEAVE_HASHLIB(self);
+-    res = SHA3_squeeze(&temp, digest, digestlen * 8);
+-    SHA3_clearstate(temp);
++    if(self->hashbitlen){
++        ENTER_HASHLIB(self);
++        SHA3_copystate(temp, self->hash_state);
++        LEAVE_HASHLIB(self);
++        res = SHA3_squeeze(&temp, digest, digestlen * 8);
++        SHA3_clearstate(temp);
++    }else{
++        ENTER_HASHLIB(self);
++        res = SHA3_squeeze(&self->hash_state, digest, digestlen * 8);
++        LEAVE_HASHLIB(self);
++    }
+     if (res != SUCCESS) {
+         PyErr_SetString(PyExc_RuntimeError, "internal error in SHA3 Squeeze()");
+         PyMem_Free(digest);
+@@ -576,12 +586,54 @@
+ #endif
+ }
+ 
++static PyObject *
++SHA3_get_state(SHA3object *self, void *closure)
++{
++    SHA3_state temp;
++    ENTER_HASHLIB(self);
++    SHA3_copystate(temp, self->hash_state);
++    LEAVE_HASHLIB(self);
++
++    return PyBytes_FromStringAndSize((const char *)&temp,
++                                     sizeof(SHA3_state));
++}
++
++static int
++SHA3_set_state(SHA3object *self, PyObject *value, void *closure)
++{
++    SHA3_state temp;
++
++    if (value == NULL) {
++        PyErr_SetString(PyExc_AttributeError, "Attribute 'state' cannot be deleted");
++        return -1;
++    }
++    if (! PyBytes_CheckExact(value)) {
++        PyErr_SetString(PyExc_TypeError, "Attribute 'state' must be a bytes");
++        return -1;
++    }
++    if (PyBytes_Size(value) != sizeof(SHA3_state)) {
++        PyErr_Format(PyExc_ValueError, "Attribute 'state' must be a bytes of length %d", sizeof(SHA3_state));
++        return -1;
++    }
++
++    /* retain GIL and copy into temporary storage */
++    SHA3_copystate(temp, *PyBytes_AsString(value));
++
++    /* potentially release GIL and copy into object state */
++    ENTER_HASHLIB(self);
++    SHA3_copystate(self->hash_state, temp);
++    LEAVE_HASHLIB(self);
++
++    return 0;
++}
++
+ static PyGetSetDef SHA3_getseters[] = {
+     {"block_size", (getter)SHA3_get_block_size, NULL, NULL, NULL},
+     {"name", (getter)SHA3_get_name, NULL, NULL, NULL},
+     {"digest_size", (getter)SHA3_get_digest_size, NULL, NULL, NULL},
+     {"_capacity_bits", (getter)SHA3_get_capacity_bits, NULL, NULL, NULL},
+     {"_rate_bits", (getter)SHA3_get_rate_bits, NULL, NULL, NULL},
++    {"state", (getter)SHA3_get_state, (setter)SHA3_set_state, NULL, NULL},
+     {NULL}  /* Sentinel */
+ };
+ 
+@@ -800,6 +852,8 @@
+ 
+     PyModule_AddIntConstant(m, "_keccakopt", KeccakOpt);
+     PyModule_AddIntConstant(m, "_hmac_support", SHA3_HMAC_SUPPORT);
++    Py_INCREF(Py_True);
++    PyModule_AddObject(m, "_varout_state_patched", Py_True);
+ 
+ #if PY_MAJOR_VERSION >= 3
+     return m;

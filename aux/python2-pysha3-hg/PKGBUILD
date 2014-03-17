@@ -1,0 +1,34 @@
+# Maintainer: Duncan Townsend <duncant@mit.edu>
+pkgname=python2-pysha3-hg
+pkgver=110.fd8c17b3cd97
+pkgrel=1
+pkgdesc="SHA-3 wrapper (keccak) for Python"
+arch=('i686' 'x86_64')
+url="https://bitbucket.org/tiran/pykeccak"
+license=('PSF')
+depends=('python2')
+makedepends=('mercurial' 'gcc')
+provides=('python2-sha3' 'python2-sha3-git')
+conflicts=('python2-sha3' 'python2-sha3-git')
+options=(!emptydirs debug !strip)
+source=('hg+https://bitbucket.org/tiran/pykeccak'
+        'varout-state.patch')
+sha256sums=('SKIP'
+            '4428a01d9c102ffa12c871ec2276c5acf87ff5d5a52bce5cde1f4cb9d7463e60')
+_hgrepo='pykeccak'
+
+pkgver() {
+  cd $_hgrepo
+  echo $(hg identify -n).$(hg identify -i)
+}
+
+build() {
+  cd $_hgrepo
+  patch -p1 < "${srcdir}"/varout-state.patch
+  python2 setup.py build
+}
+
+package() {
+  cd $_hgrepo
+  python2 setup.py install --root="$pkgdir/" --optimize=1
+}

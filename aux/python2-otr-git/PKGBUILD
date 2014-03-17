@@ -1,0 +1,32 @@
+# Maintainer: Duncan Townsend <duncant@mit.edu>
+pkgname=python2-otr-git
+pkgver=1.0.0.0.g1003d95
+pkgrel=1
+pkgdesc="Pure Python implementation of OTR"
+arch=('any')
+url="https://github.com/afflux/pure-python-otr"
+license=('LGPL3')
+depends=('python2' 'python2-crypto')
+makedepends=('git')
+provides=('python2-otr')
+conflicts=('python2-otr')
+options=(!emptydirs)
+source=('git+https://github.com/afflux/pure-python-otr.git')
+sha256sums=('SKIP')
+_gitrepo='pure-python-otr'
+
+pkgver() {
+	cd $_gitrepo
+	local ver="$(git describe --long)"
+	printf "%s" "${ver//-/.}"
+}
+
+build() {
+    cd $_gitrepo
+    python2 setup.py build
+}
+
+package() {
+    cd $_gitrepo
+    python2 setup.py install --root="$pkgdir/" --optimize=1
+}
