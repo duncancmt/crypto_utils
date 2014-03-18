@@ -53,7 +53,6 @@ class Curve25519ElGamalKey(object):
             return super(Curve25519ElGamalKey, self).__init__()
         raise RuntimeError("Do not directly instantiate Curve25519ElGamalKey objects, use the alternate constructors")
 
-    
     def encrypt(self, message, random=random):
         if not isinstance(message, Curve25519Element):
             message = message_to_element(message)
@@ -66,9 +65,9 @@ class Curve25519ElGamalKey(object):
         # c3 = message*c2 = message * g^(seckey * r)
         c3 = message * Curve25519Element(c2)
         return (c1, c3)
-
     
     def decrypt(self, message):
+        # TODO: add alternate second argument
         c1, d = message
         # c = c1^seckey = g^(seckey * r)
         c = curve(self.seckey, c1)
@@ -76,6 +75,9 @@ class Curve25519ElGamalKey(object):
         m = d / Curve25519Element(c)
         return element_to_message(m)
 
+    @classmethod
+    def generate(cls, random=random):
+        return cls.from_seckey(int2bytes(random.getrandbits(32*8), length=32, endian='little'))
     @classmethod
     def from_pubkey(cls, pubkey):
         if reduce(or_, imap(lambda bad: secure_compare(pubkey, bad), bad_public_keys)):
@@ -90,6 +92,7 @@ class Curve25519ElGamalKey(object):
     def from_privkey(cls, privkey):
         return cls.from_seckey(privkey)
 
+    ### Aliases for immutable state
     @property
     def pubkey(self):
         try:
