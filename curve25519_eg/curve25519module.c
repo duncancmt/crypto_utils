@@ -17,13 +17,13 @@
 #include "curve25519-donna.h"
 
 static PyObject *
-pycurve25519_makeelement(PyObject *self, PyObject *args)
+pycurve25519_makeseckey(PyObject *self, PyObject *args)
 {
     char *in1;
     char result[32];
     size_t i;
     Py_ssize_t in1len;
-    if (!PyArg_ParseTuple(args, y"#:makelement", &in1, &in1len))
+    if (!PyArg_ParseTuple(args, y"#:makeseckey", &in1, &in1len))
         return NULL;
     if (in1len != 32) {
         PyErr_SetString(PyExc_ValueError, "input must be 32-byte string");
@@ -103,7 +103,7 @@ pycurve25519_recip(PyObject *self, PyObject *args)
 
 static PyMethodDef
 curve25519_functions[] = {
-    {"make_element", pycurve25519_makeelement, METH_VARARGS, "data->point"},
+    {"make_seckey", pycurve25519_makeseckey, METH_VARARGS, "data->element"},
     {"curve", pycurve25519_curve, METH_VARARGS, "element+point->point"},
     {"mul", pycurve25519_mul, METH_VARARGS, "element*element->element"},
     {"recip", pycurve25519_recip, METH_VARARGS, "element->element"},
