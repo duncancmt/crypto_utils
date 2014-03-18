@@ -4,50 +4,44 @@ from constants import *
 from intbytes import int2bytes, bytes2int
 from immutable import ImmutableEnforcerMeta
 
-try:
-    from gmpy2 import mpz, invert
-    mpz_type = type(mpz())
-    has_gmpy = True
-except ImportError:
-    try:
-        from gmpy import mpz, invert
-        mpz_type = type(mpz())
-        has_gmpy = True
-    except ImportError:
-        import warnings
-        warnings.warn('Not having gmpy2 or gmpy makes this at least 10x slower')
-        mpz_type = Integral
-        has_gmpy = False
 
-if not has_gmpy:
-    def egcd(a, b):
-        """The Extended Euclidean Algorithm
-        In addition to finding the greatest common divisor (GCD) of the
-        arguments, also find and return the coefficients of the linear
-        combination that results in the GCD.
-        """
-        if a == 0:
-            return (b, 0, 1)
-        else:
-            g, y, x = egcd(b % a, a)
-            return (g, x - (b // a) * y, y)
-    def invert(a, m):
-        """Return the multiplicative inverse of a, mod m"""
-        g, x, y = egcd(a, m)
-        if g != 1:
-            raise ValueError('modular inverse does not exist')
-        else:
-            return x % m
+def validate_privkey(k):
+    k_prime = map(ord, k)
+    k_prime[0] &= 248
+    k_prime[31] &= 127
+    k_prime[31] |= 64
+    if k != ''.join(map(chr, k_prime)):
+        assert _curve25519.make_element(k) != k
+        assert int2bytes(bytes2int(k) % bytes2int(p), length=32, endian='little') != k
+        return False
+    else:
+        assert _curve25519.make_element(k) == k
+        assert int2bytes(bytes2int(k) % bytes2int(p), length=32, endian='little') == k
+        return True
 
-def modproduct(a, b):
-    return int2bytes(bytes2int(a, endian='little') * bytes2int(b, endian='little')\
-                     % bytes2int(p, endian='little'),
-                     length=32,
-                     endian='little')
-def modinvert(a):
-    return int2bytes(invert(bytes2int(a, endian='little'), bytes2int(p, endian='little')),
-                     length=32,
-                     endian='little')
+def curve(element, point):
+    assert isinstance(element, Curve25519Element)
+    assert isinstance(point, Curve25519Point)
+    return Curve25519Point(_curve25519.curve(element, point))
+
+def message_to_element(message):
+    if isinstance(message, bytes):
+        message = bytes2int(message, endian='little')
+    if message >= 2**251:
+        raise ValueError("Message too large to fit into an element")
+    message <<= 3
+    message = int2bytes(message, length=32, endian='little')
+    message = _curve25519.make_element(message)
+    message = Curve25519Element(message)
+    return message
+
+def element_to_message(element):
+    if not isinstance(element, Curve25519Element):
+        raise TypeError("Attempted to convert a non-element to a message")
+    element = bytes2int(element, endian='little')
+    element &= bytes2int('\xf8'+'\xff'*30+'\x3f', endian='little')
+    element >>= 3
+    return int2bytes(element, length=32, endian='little')
 
 class Curve25519ElGamalKey(object):
     __metaclass__ = ImmutableEnforcerMeta
@@ -66,43 +60,43 @@ class Curve25519ElGamalKey(object):
                or len(message) != 32:
             raise ValueError("Message must be a string of length 32")
         # r is a random group element
-        r = int2bytes(random.getrandbits(32*8), length=32, endian='little')
+        r = Curve25519Element(random.getrandbits(32*8))
         # c1 = g^r
-        c1 = _curve25519.curve(r, base)
+        c1 = curve(r, base)
         # c2 = pubkey^r = g^(seckey * r)
-        c2 = _curve25519.curve(r, self.pubkey)
+        c2 = curve(r, self.pubkey)
         # c3 = message*c2 = message * g^(seckey * r)
-        c3 = modproduct(c2, message)
+        c3 = message * Curve25519Element(c2)
         return (c1, c3)
 
     
     def decrypt(self, message):
         c1, d = message
         # c = c1^seckey = g^(seckey * r)
-        c = _curve25519.curve(self.seckey, c1)
-        # c_prime = c^-1 = g^(seckey * r)^-1
-        c_prime = modinvert(c)
-        # m = d*c_prime = original * g^(seckey * r) * g^(seckey * r)^-1 = original
-        m = modproduct(d, c_prime) 
+        c = curve(self.seckey, c1)
+        # m = d/c = original * g^(seckey * r) * g^(seckey * r)^-1 = original
+        m = d / Curve25519Element(c)
         return m
 
     @classmethod
     def from_pubkey(cls, pubkey):
         # TODO: check for bad pubkeys
-        return cls(_pubkey=pubkey)
+        return cls(_pubkey=Curve25519Point(pubkey))
     @classmethod
     def from_seckey(cls, seckey):
-        return cls(_seckey=_curve25519.make_private(seckey))
+        seckey = _curve25519.make_element(seckey)
+        return cls(_seckey=Curve25519Element(seckey))
 
     @property
     def pubkey(self):
         try:
             return self._pubkey
         except AttributeError:
-            self.pubkey = _curve25519.make_private(self.seckey)
+            self.pubkey = curve(self.seckey, base)
             return self._pubkey
     @pubkey.setter
     def pubkey(self, pubkey):
+        assert isinstance(pubkey, Curve25519Point)
         self._pubkey = pubkey
 
     @property
@@ -110,6 +104,7 @@ class Curve25519ElGamalKey(object):
         return self._seckey
     @seckey.setter
     def seckey(self, seckey):
+        assert isinstance(seckey, Curve25519Element)
         self._seckey = seckey
 
 

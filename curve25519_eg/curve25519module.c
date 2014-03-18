@@ -18,9 +18,11 @@ int curve25519_donna(char *mypublic,
                      const char *secret, const char *basepoint);
 
 static PyObject *
-pycurve25519_makeprivate(PyObject *self, PyObject *args)
+pycurve25519_makeelement(PyObject *self, PyObject *args)
 {
     char *in1;
+    char result[32];
+    size_t i;
     Py_ssize_t in1len;
     if (!PyArg_ParseTuple(args, y"#:clamp", &in1, &in1len))
         return NULL;
@@ -28,10 +30,11 @@ pycurve25519_makeprivate(PyObject *self, PyObject *args)
         PyErr_SetString(PyExc_ValueError, "input must be 32-byte string");
         return NULL;
     }
-    in1[0] &= 248;
-    in1[31] &= 127;
-    in1[31] |= 64;
-    return PyBytes_FromStringAndSize((char *)in1, 32);
+    for (i = 0; i < 32; ++i) result[i] = in1[i];
+    result[0] &= 248;
+    result[31] &= 127;
+    result[31] |= 64;
+    return PyBytes_FromStringAndSize((char *)result, 32);
 }
 
 static PyObject *
@@ -58,7 +61,7 @@ pycurve25519_curve(PyObject *self, PyObject *args)
 
 static PyMethodDef
 curve25519_functions[] = {
-    {"make_private", pycurve25519_makeprivate, METH_VARARGS, "data->private"},
+    {"make_element", pycurve25519_makeelement, METH_VARARGS, "data->point"},
     {"curve", pycurve25519_curve, METH_VARARGS, "scalar+point->point"},
     {NULL, NULL, 0, NULL},
 };
