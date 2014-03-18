@@ -48,14 +48,11 @@
 
 #include <string.h>
 #include <stdint.h>
+#include "curve25519-donna.h"
 
 #ifdef _MSC_VER
 #define inline __inline
 #endif
-
-typedef uint8_t u8;
-typedef int32_t s32;
-typedef int64_t limb;
 
 /* Field element representation:
  *
@@ -324,7 +321,7 @@ static void freduce_coefficients(limb *output) {
  * output must be distinct to both inputs. The output is reduced degree and
  * reduced coefficient.
  */
-static void
+void
 fmul(limb *output, const limb *in, const limb *in2) {
   limb t[19];
   fproduct(t, in, in2);
@@ -401,7 +398,7 @@ fsquare(limb *output, const limb *in) {
 }
 
 /* Take a little-endian, 32-byte number and expand it into polynomial form */
-static void
+void
 fexpand(limb *output, const u8 *input) {
 #define F(n,start,shift,mask) \
   output[n] = ((((limb) input[start + 0]) | \
@@ -428,7 +425,7 @@ fexpand(limb *output, const u8 *input) {
 /* Take a fully reduced polynomial form number and contract it into a
  * little-endian, 32-byte array
  */
-static void
+void
 fcontract(u8 *output, limb *input) {
   int i;
   int j;
@@ -644,7 +641,7 @@ cmult(limb *resultx, limb *resultz, const u8 *n, const limb *q) {
 // -----------------------------------------------------------------------------
 // Shamelessly copied from djb's code
 // -----------------------------------------------------------------------------
-static void
+void
 crecip(limb *out, const limb *z) {
   limb z2[10];
   limb z9[10];
@@ -710,8 +707,6 @@ crecip(limb *out, const limb *z) {
   /* 2^255 - 2^5 */ fsquare(t1,t0);
   /* 2^255 - 21 */ fmul(out,t1,z11);
 }
-
-int curve25519_donna(u8 *, const u8 *, const u8 *);
 
 int
 curve25519_donna(u8 *mypublic, const u8 *secret, const u8 *basepoint) {

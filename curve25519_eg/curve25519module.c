@@ -14,8 +14,7 @@
 	#define y "t"
 #endif
 
-int curve25519_donna(char *mypublic, 
-                     const char *secret, const char *basepoint);
+#include "curve25519-donna.h"
 
 static PyObject *
 pycurve25519_makeelement(PyObject *self, PyObject *args)
@@ -24,7 +23,7 @@ pycurve25519_makeelement(PyObject *self, PyObject *args)
     char result[32];
     size_t i;
     Py_ssize_t in1len;
-    if (!PyArg_ParseTuple(args, y"#:clamp", &in1, &in1len))
+    if (!PyArg_ParseTuple(args, y"#:makelement", &in1, &in1len))
         return NULL;
     if (in1len != 32) {
         PyErr_SetString(PyExc_ValueError, "input must be 32-byte string");
@@ -43,7 +42,7 @@ pycurve25519_curve(PyObject *self, PyObject *args)
     const char *x, *Y;
     char result[32];
     Py_ssize_t xlen, Ylen;
-    if (!PyArg_ParseTuple(args, y"#"y"#:generate",
+    if (!PyArg_ParseTuple(args, y"#"y"#:curve",
                           &x, &xlen, &Y, &Ylen))
         return NULL;
     if (xlen != 32) {
@@ -58,11 +57,56 @@ pycurve25519_curve(PyObject *self, PyObject *args)
     return PyBytes_FromStringAndSize((char *)result, 32);
 }
 
+static PyObject *
+pycurve25519_mul(PyObject *self, PyObject *args)
+{
+    char *a, *b;
+    char result[32];
+    limb al[10], bl[10], work[10];
+    Py_ssize_t alen, blen;
+    if (!PyArg_ParseTuple(args, y"#"y"#:mul",
+                          &a, &alen, &b, &blen))
+        return NULL;
+    if (alen != 32) {
+        PyErr_SetString(PyExc_ValueError, "input must be 32-byte string");
+        return NULL;
+    }
+    if (blen != 32) {
+        PyErr_SetString(PyExc_ValueError, "input must be 32-byte string");
+        return NULL;
+    }
+    fexpand(al, a);
+    fexpand(bl, b);
+    fmul(work, al, bl);
+    fcontract(result, work);
+    return PyBytes_FromStringAndSize((char *)result, 32);
+}
+
+static PyObject *
+pycurve25519_recip(PyObject *self, PyObject *args)
+{
+    char *a;
+    char result[32];
+    limb al[10], work[10];
+    Py_ssize_t alen;
+    if (!PyArg_ParseTuple(args, y"#:recip", &a, &alen))
+        return NULL;
+    if (alen != 32) {
+        PyErr_SetString(PyExc_ValueError, "input must be 32-byte string");
+        return NULL;
+    }
+    fexpand(al, a);
+    crecip(work, al);
+    fcontract(result, work);
+    return PyBytes_FromStringAndSize((char *)result, 32);
+}
 
 static PyMethodDef
 curve25519_functions[] = {
     {"make_element", pycurve25519_makeelement, METH_VARARGS, "data->point"},
-    {"curve", pycurve25519_curve, METH_VARARGS, "scalar+point->point"},
+    {"curve", pycurve25519_curve, METH_VARARGS, "element+point->point"},
+    {"mul", pycurve25519_mul, METH_VARARGS, "element*element->element"},
+    {"recip", pycurve25519_recip, METH_VARARGS, "element->element"},
     {NULL, NULL, 0, NULL},
 };
 
