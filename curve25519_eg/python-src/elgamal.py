@@ -1,8 +1,11 @@
 import random
 import _curve25519
+from operator import or_
+from itertools import imap
 from constants import *
 from intbytes import int2bytes, bytes2int
 from immutable import ImmutableEnforcerMeta
+from util import secure_compare
 
 
 def curve(element, point):
@@ -66,12 +69,17 @@ class Curve25519ElGamalKey(object):
 
     @classmethod
     def from_pubkey(cls, pubkey):
-        # TODO: check for bad pubkeys
-        return cls(_pubkey=Curve25519Point(pubkey))
+        if reduce(or_, imap(lambda bad: secure_compare(pubkey, bad), bad_public_keys)):
+            raise RuntimeError("Tried to instantiate Curve25519ElGamalKey with a bad public key")
+        else:
+            return cls(_pubkey=Curve25519Point(pubkey))
     @classmethod
     def from_seckey(cls, seckey):
         seckey = _curve25519.make_seckey(seckey)
         return cls(_seckey=Curve25519Element(seckey))
+    @classmethod
+    def from_privkey(cls, privkey):
+        return cls.from_seckey(privkey)
 
     @property
     def pubkey(self):
