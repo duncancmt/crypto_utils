@@ -50,6 +50,8 @@
 #include <stdint.h>
 #include "curve25519-donna.h"
 
+typedef int32_t s32;
+
 #ifdef _MSC_VER
 #define inline __inline
 #endif
@@ -706,6 +708,26 @@ crecip(limb *out, const limb *z) {
   /* 2^254 - 2^4 */ fsquare(t0,t1);
   /* 2^255 - 2^5 */ fsquare(t1,t0);
   /* 2^255 - 21 */ fmul(out,t1,z11);
+}
+
+void
+mul(u8 *output, const u8 *in, const u8 *in2) {
+  fmul((limb *)output, (const limb *)in, (const limb *)in2);
+}
+
+void
+expand(u8 *output, const u8 *in) {
+  fexpand((limb *)output, (const u8 *)in);
+}
+
+void
+contract(u8 *output, const u8 *in) {
+  fcontract((u8 *)output, (limb *)in);
+}
+
+int
+recip(u8 *output, const u8* z) {
+  return crecip((limb *)output, (const limb *)z);
 }
 
 int

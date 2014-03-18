@@ -1,5 +1,6 @@
 #! /usr/bin/python
 
+from struct import calcsize
 from subprocess import Popen, PIPE
 from distutils.core import setup, Extension
 
@@ -8,10 +9,19 @@ version = Popen(["git", "describe", "--tags"], stdout=PIPE).communicate()[0]\
 if len(version) == 0 or version.startswith('fatal'):
     version = '0.0.0'
 
-ext_modules = [Extension("curve25519._curve25519",
-                         ["curve25519module.c",
-                          "curve25519-donna.c"],
-                         )]
+if calcsize("P") == 8: # 64-bit platform
+    ext_modules = [Extension("curve25519._curve25519",
+                             ["curve25519module.c",
+                              "curve25519-donna-c64.c"],
+                             )]
+elif calcsize("P") == 4: # 32-bit platform
+    ext_modules = [Extension("curve25519._curve25519",
+                             ["curve25519module.c",
+                              "curve25519-donna.c"],
+                             )]
+else:
+    raise Exception("This module is only supported on 32-bit and 64-bit platforms")
+
 
 short_description="Python wrapper for the Curve25519 cryptographic library"
 long_description="""\

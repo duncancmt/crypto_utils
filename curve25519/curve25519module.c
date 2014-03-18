@@ -62,7 +62,7 @@ pycurve25519_mul(PyObject *self, PyObject *args)
 {
     char *a, *b;
     char result[32];
-    limb al[10], bl[10], work[10];
+    u8 al[80], bl[80], work[80];
     Py_ssize_t alen, blen;
     if (!PyArg_ParseTuple(args, y"#"y"#:mul",
                           &a, &alen, &b, &blen))
@@ -75,10 +75,10 @@ pycurve25519_mul(PyObject *self, PyObject *args)
         PyErr_SetString(PyExc_ValueError, "input must be 32-byte string");
         return NULL;
     }
-    fexpand(al, a);
-    fexpand(bl, b);
-    fmul(work, al, bl);
-    fcontract(result, work);
+    expand(al, a);
+    expand(bl, b);
+    mul(work, al, bl);
+    contract(result, work);
     return PyBytes_FromStringAndSize((char *)result, 32);
 }
 
@@ -87,7 +87,7 @@ pycurve25519_recip(PyObject *self, PyObject *args)
 {
     char *a;
     char result[32];
-    limb al[10], work[10];
+    u8 al[80], work[80];
     Py_ssize_t alen;
     if (!PyArg_ParseTuple(args, y"#:recip", &a, &alen))
         return NULL;
@@ -95,9 +95,9 @@ pycurve25519_recip(PyObject *self, PyObject *args)
         PyErr_SetString(PyExc_ValueError, "input must be 32-byte string");
         return NULL;
     }
-    fexpand(al, a);
-    crecip(work, al);
-    fcontract(result, work);
+    expand(al, a);
+    recip(work, al);
+    contract(result, work);
     return PyBytes_FromStringAndSize((char *)result, 32);
 }
 

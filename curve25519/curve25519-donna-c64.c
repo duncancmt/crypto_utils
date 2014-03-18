@@ -426,6 +426,26 @@ crecip(felem out, const felem z) {
   /* 2^255 - 21 */ fmul(out, t0, a);
 }
 
+void
+mul(u8 *output, const u8 *in, const u8 *in2) {
+  fmul((limb *)output, (const limb *)in, (const limb *)in2);
+}
+
+void
+expand(u8 *output, const u8 *in) {
+  fexpand((limb *)output, (const u8 *)in);
+}
+
+void
+contract(u8 *output, const u8 *in) {
+  fcontract((u8 *)output, (const limb *)in);
+}
+
+void
+recip(u8 *output, const u8* z) {
+  crecip((limb *)output, (const limb *)z);
+}
+
 int
 curve25519_donna(u8 *mypublic, const u8 *secret, const u8 *basepoint) {
   limb bp[5], x[5], z[5], zmone[5];
