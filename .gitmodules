@@ -1,4 +1,0 @@
-[submodule "curve25519"]
-	path = curve25519
-	url = https://github.com/agl/curve25519-donna.git
-	branch = master
