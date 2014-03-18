@@ -3,7 +3,7 @@ import _curve25519
 from operator import or_
 from itertools import imap
 from constants import *
-from intbytes import int2bytes, bytes2int
+from intbytes import int2bytes, bytes2int, encode_varint, decode_varint
 from immutable import ImmutableEnforcerMeta
 from util import secure_compare
 
@@ -14,13 +14,20 @@ def curve(element, point):
     return Curve25519Point(_curve25519.curve(element, point))
 
 def message_to_element(message):
-    if isinstance(message, bytes):
-        message = bytes2int(message, endian='little')
+    if not isinstance(message, bytes):
+        message = int2bytes(message, endian='little')
+
+    encoded_length = encode_varint(len(message), endian='little')
+    null_padding = '\x00'*(31 - len(encoded_length) - len(message))
+    message += null_padding
+    message += encoded_length
+    message = bytes2int(message, endian='little')
+
     if message >= 2**251:
         raise ValueError("Message too large to fit into an element")
     message <<= 3
     message = int2bytes(message, length=32, endian='little')
-    message = _curve25519.make_element(message)
+    message = _curve25519.make_seckey(message)
     message = Curve25519Element(message)
     return message
 
@@ -30,7 +37,10 @@ def element_to_message(element):
     element = bytes2int(element, endian='little')
     element &= bytes2int('\xf8'+'\xff'*30+'\x3f', endian='little')
     element >>= 3
-    return int2bytes(element, length=32, endian='little')
+    element = int2bytes(element, endian='little')
+    length, consumed = decode_varint(element, endian='little')
+    element = element[:length]
+    return element
 
 class Curve25519ElGamalKey(object):
     __metaclass__ = ImmutableEnforcerMeta
@@ -45,9 +55,8 @@ class Curve25519ElGamalKey(object):
 
     
     def encrypt(self, message, random=random):
-        if (not isinstance(message, basestring)) \
-               or len(message) != 32:
-            raise ValueError("Message must be a string of length 32")
+        if not isinstance(message, Curve25519Element):
+            message = message_to_element(message)
         # r is a random group element
         r = Curve25519Element(random.getrandbits(32*8))
         # c1 = g^r
@@ -65,7 +74,7 @@ class Curve25519ElGamalKey(object):
         c = curve(self.seckey, c1)
         # m = d/c = original * g^(seckey * r) * g^(seckey * r)^-1 = original
         m = d / Curve25519Element(c)
-        return m
+        return element_to_message(m)
 
     @classmethod
     def from_pubkey(cls, pubkey):
