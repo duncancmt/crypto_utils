@@ -32,6 +32,14 @@ def element_to_string(element):
     element = element[:length]
     return element
 
+class Curve25519PlainText(Curve25519Element):
+    def __new__(cls, x):
+        if (isinstance(x, Integral) and x > bytes2int(p, endian='little'))\
+               or (isinstance(x, bytes) and bytes2int(x, endian='little') > bytes2int(p, endian='little')):
+            raise ValueError("message too large/long to fit into a plaintext")
+        elif not (isinstance(x, Integral) or isinstance(x, bytes)):
+            raise TypeError("Can only instantiate Curve25519PlainText instances from integers or bytes")
+        return super(Curve25519PlainText, cls).__new__(cls, x)
 Curve25519CipherText = namedtuple("Curve25519CipherText", ["locks", "box"])
 
 class Curve25519ElGamalKey(object):
@@ -52,35 +60,44 @@ class Curve25519ElGamalKey(object):
         raise RuntimeError("Do not directly instantiate Curve25519ElGamalKey objects, use the alternate constructors")
 
     def encrypt(self, message, random=random):
-        if not isinstance(message, Curve25519Element):
-            message = message_to_element(message)
+        if not (isinstance(message, Curve25519Element) or isinstance(message, Curve25519CipherText)):
+            raise TypeError("Argument message must be a Curve25519Element, Curve25519PlainText, or Curve25519CipherText instance")
         # r is a random element of the subgroun Z_q
         r = Curve25519SubElement(random.getrandbits(32*8))
-        # c1 = g^r
-        c1 = curve(r, base)
-        # c2 = pubkey^r = g^(seckey * r)
-        c2 = curve(r, self.pubkey)
-        # c3 = message*c2 = message * g^(seckey * r)
-        c3 = message * Curve25519Element(c2)
-        return Curve25519CipherText(locks={self.pubkey:c1}, box=c3)
-    
-    def decrypt(self, message, box=None):
-        if box is not None:
-            c1 = message[self.pubkey]
-            d = box
+        # lock = g^r
+        lock = curve(r, base)
+        # c = pubkey^r = g^(seckey * r)
+        c = curve(r, self.pubkey)
+        # box = message*c = message * g^(seckey * r)
+        if isinstance(message, Curve25519CipherText):
+            box = message.box * Curve25519Element(c)
+            if self.pubkey in message.locks:
+                lock *= message.locks[self.pubkey]
+            locks = message.locks.copy()
+            locks[self.pubkey] = lock
+            return Curve25519CipherText(locks=locks, box=box)
         else:
-            if not isinstance(message, Curve25519CipherText):
-                raise TypeError("Invalid ciphertext")
-            c1 = message.locks[self.pubkey]
-            d = message.box
-        if not (isinstance(c1, Curve25519Point) and isinstance(box, Curve25519Element)):
+            box = message * Curve25519Element(c)
+            return Curve25519CipherText(locks={self.pubkey:lock}, box=box)
+
+    def decrypt(self, message):
+        if not isinstance(message, Curve25519CipherText):
+            raise TypeError("Argument message must be a Curve25519CipherText instance")
+        lock = message.locks[self.pubkey]
+        box = message.box
+        if not (isinstance(lock, Curve25519Point) and isinstance(box, Curve25519Element)):
             raise TypeError("Invalid ciphertext")
 
-        # c = c1^seckey = g^(seckey * r)
-        c = curve(self.seckey, c1)
-        # m = d/c = original * g^(seckey * r) * g^(seckey * r)^-1 = original
-        m = d / Curve25519Element(c)
-        return element_to_message(m)
+        # unlocked = lock^seckey = g^(seckey * r)
+        unlocked = curve(self.seckey, lock)
+        # m = box/lock = original * g^(seckey * r) * g^(seckey * r)^-1 = original
+        m = box / Curve25519Element(unlocked)
+        if len(message.locks) == 1:
+            return Curve25519PlainText(m)
+        else:
+            locks = message.locks.copy()
+            del locks[self.pubkey]
+            return Curve25519CipherText(locks=locks, box=m)
 
     @classmethod
     def generate(cls, random=random):
@@ -120,4 +137,4 @@ class Curve25519ElGamalKey(object):
         self._seckey = seckey
 
 
-__all__ = ['Curve25519ElGamalKey', 'Curve25519CipherText']
+__all__ = ['Curve25519ElGamalKey', 'Curve25519PlainText', 'Curve25519CipherText']
