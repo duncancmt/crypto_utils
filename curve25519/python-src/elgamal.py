@@ -8,23 +8,24 @@ from immutable import ImmutableEnforcerMeta
 from util import secure_compare
 
 
-def message_to_element(message):
-    if not isinstance(message, bytes):
-        message = int2bytes(message, endian='little')
+def string_to_element(s):
+    if not isinstance(s, bytes):
+        s = int2bytes(s, endian='little')
+    if len(s) > 30:
+        raise ValueError("Argument too large to fit into an element")
 
-    # TODO: this section assumes that message < p
-    encoded_length = encode_varint(len(message), endian='little')
-    null_padding = '\x00'*(31 - len(encoded_length) - len(message))
-    message += null_padding
-    message += encoded_length
-    message = bytes2int(message, endian='little')
+    encoded_length = encode_varint(len(s), endian='little')
+    null_padding = '\x00'*(31 - len(encoded_length) - len(s))
+    s += null_padding
+    s += encoded_length
+    s = bytes2int(s, endian='little')
 
-    if message >= p:
-        raise ValueError("Message too large to fit into an element")
-    message = Curve25519Element(message)
-    return message
+    if s >= p:
+        raise ValueError("Argument too large to fit into an element")
+    s = Curve25519Element(s)
+    return s
 
-def element_to_message(element):
+def element_to_string(element):
     if not isinstance(element, Curve25519Element):
         raise TypeError("Attempted to convert a non-element to a message")
     length, consumed = decode_varint(element, endian='little')
@@ -35,6 +36,7 @@ Curve25519CipherText = namedtuple("Curve25519CipherText", ["locks", "box"])
 
 class Curve25519ElGamalKey(object):
     # TODO: allow hashing of the shared secret before multiplication
+    # TODO: allow customization of the message<->element conversion
     """Implements encoding-free multiplicative ElGamal encryption as described in
     Encoding-Free ElGamal Encryption Without Random Oracles by Chevallier-Mames et.al.
     over Curve25519 as described in
@@ -62,11 +64,18 @@ class Curve25519ElGamalKey(object):
         c3 = message * Curve25519Element(c2)
         return Curve25519CipherText(locks={self.pubkey:c1}, box=c3)
     
-    def decrypt(self, message):
-        # TODO: add alternate second argument
-        # TODO: type check
-        c1 = message.locks[self.pubkey]
-        d = message.box
+    def decrypt(self, message, box=None):
+        if box is not None:
+            c1 = message[self.pubkey]
+            d = box
+        else:
+            if not isinstance(message, Curve25519CipherText):
+                raise TypeError("Invalid ciphertext")
+            c1 = message.locks[self.pubkey]
+            d = message.box
+        if not (isinstance(c1, Curve25519Point) and isinstance(box, Curve25519Element)):
+            raise TypeError("Invalid ciphertext")
+
         # c = c1^seckey = g^(seckey * r)
         c = curve(self.seckey, c1)
         # m = d/c = original * g^(seckey * r) * g^(seckey * r)^-1 = original
