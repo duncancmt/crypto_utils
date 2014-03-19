@@ -35,7 +35,8 @@ know Apublic and Bpublic).
 This is a Python wrapper for the portable 'curve25519-donna' implementation
 of this algorithm, written by Adam Langley, hosted at
 http://code.google.com/p/curve25519-donna/. Python wrapper originally by
-Brian Warner, substantially modified by Duncan Townsend.
+Brian Warner, substantially modified by Duncan Townsend. ElGamal
+implementation by Duncan Townsend.
 """
 
 setup(name="curve25519-donna",
