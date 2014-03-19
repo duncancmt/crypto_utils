@@ -30,6 +30,8 @@ class Curve25519Element(bytes):
                           length=32,
                           endian='little')
         elif isinstance(x, bytes):
+            if len(x) != 32:
+                raise ValueError("When instantiating Curve25519Element from bytes, argument must be of length 32")
             x = int2bytes(bytes2int(x, endian='little') % bytes2int(p, endian='little'),
                           length=32,
                           endian='little')
@@ -57,9 +59,11 @@ class Curve25519SubElement(Curve25519Element):
         if isinstance(x, Integral):
             x = _curve25519.make_seckey(int2bytes(x, length=32, endian='little'))
         elif isinstance(x, bytes):
-            x = int2bytes(x, length=32, endian='little')
+            if len(x) != 32:
+                raise ValueError("When instantiating Curve25519SubElement from bytes, argument must be of length 32")
+            x = _curve25519.make_seckey(x)
         else:
-            raise TypeError("Can only instantiate Curve25519Element instances from integers or bytes")
+            raise TypeError("Can only instantiate Curve25519SubElement instances from integers or bytes")
         return super(Curve25519SubElement, cls).__new__(cls, x)
 
 

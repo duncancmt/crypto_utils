@@ -2,6 +2,7 @@ import random
 from operator import or_
 from itertools import imap
 from collections import namedtuple
+from numbers import Integral
 from curve import *
 from intbytes import int2bytes, bytes2int, encode_varint, decode_varint
 from immutable import ImmutableEnforcerMeta
@@ -70,9 +71,11 @@ class Curve25519ElGamalKey(object):
         c = curve(r, self.pubkey)
         # box = message*c = message * g^(seckey * r)
         if isinstance(message, Curve25519CipherText):
-            box = message.box * Curve25519Element(c)
             if self.pubkey in message.locks:
-                lock *= message.locks[self.pubkey]
+                # below is approximately what ought to happen instead of throwing an error
+                # lock *= message.locks[self.pubkey]
+                raise ValueError("This ciphertext has already been encrypted with this key")
+            box = message.box * Curve25519Element(c)
             locks = message.locks.copy()
             locks[self.pubkey] = lock
             return Curve25519CipherText(locks=locks, box=box)
