@@ -323,7 +323,7 @@ static void freduce_coefficients(limb *output) {
  * output must be distinct to both inputs. The output is reduced degree and
  * reduced coefficient.
  */
-void
+static void
 fmul(limb *output, const limb *in, const limb *in2) {
   limb t[19];
   fproduct(t, in, in2);
@@ -400,7 +400,7 @@ fsquare(limb *output, const limb *in) {
 }
 
 /* Take a little-endian, 32-byte number and expand it into polynomial form */
-void
+static void
 fexpand(limb *output, const u8 *input) {
 #define F(n,start,shift,mask) \
   output[n] = ((((limb) input[start + 0]) | \
@@ -427,7 +427,7 @@ fexpand(limb *output, const u8 *input) {
 /* Take a fully reduced polynomial form number and contract it into a
  * little-endian, 32-byte array
  */
-void
+static void
 fcontract(u8 *output, limb *input) {
   int i;
   int j;
@@ -643,7 +643,7 @@ cmult(limb *resultx, limb *resultz, const u8 *n, const limb *q) {
 // -----------------------------------------------------------------------------
 // Shamelessly copied from djb's code
 // -----------------------------------------------------------------------------
-void
+static void
 crecip(limb *out, const limb *z) {
   limb z2[10];
   limb z9[10];

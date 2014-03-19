@@ -94,7 +94,7 @@ fscalar_product(felem output, const felem in, const limb scalar) {
  * Assumes that in[i] < 2**55 and likewise for in2.
  * On return, output[i] < 2**52
  */
-inline void force_inline
+static inline void force_inline
 fmul(felem output, const felem in2, const felem in) {
   uint128_t t[5];
   limb r0,r1,r2,r3,r4,s0,s1,s2,s3,s4,c;
@@ -212,7 +212,7 @@ store_limb(u8 *out, limb in) {
 }
 
 /* Take a little-endian, 32-byte number and expand it into polynomial form */
-void
+static void
 fexpand(limb *output, const u8 *in) {
   output[0] = load_limb(in) & 0x7ffffffffffff;
   output[1] = (load_limb(in+6) >> 3) & 0x7ffffffffffff;
@@ -224,7 +224,7 @@ fexpand(limb *output, const u8 *in) {
 /* Take a fully reduced polynomial form number and contract it into a
  * little-endian, 32-byte array
  */
-void
+static void
 fcontract(u8 *output, const felem input) {
   uint128_t t[5];
 
@@ -398,7 +398,7 @@ cmult(limb *resultx, limb *resultz, const u8 *n, const limb *q) {
 // -----------------------------------------------------------------------------
 // Shamelessly copied from djb's code, tightened a little
 // -----------------------------------------------------------------------------
-void
+static void
 crecip(felem out, const felem z) {
   felem a,t0,b,c;
 
