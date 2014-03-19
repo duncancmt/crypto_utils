@@ -1,5 +1,4 @@
 import random
-import _curve25519
 from operator import or_
 from itertools import imap
 from constants import *
@@ -8,41 +7,34 @@ from immutable import ImmutableEnforcerMeta
 from util import secure_compare
 
 
-def curve(element, point):
-    assert isinstance(element, Curve25519Element)
-    assert isinstance(point, Curve25519Point)
-    return Curve25519Point(_curve25519.curve(element, point))
-
 def message_to_element(message):
     if not isinstance(message, bytes):
         message = int2bytes(message, endian='little')
 
+    # TODO: this section assumes that message < p
     encoded_length = encode_varint(len(message), endian='little')
     null_padding = '\x00'*(31 - len(encoded_length) - len(message))
     message += null_padding
     message += encoded_length
     message = bytes2int(message, endian='little')
 
-    if message >= 2**251:
+    if message >= p:
         raise ValueError("Message too large to fit into an element")
-    message <<= 3
-    message = int2bytes(message, length=32, endian='little')
-    message = _curve25519.make_seckey(message)
     message = Curve25519Element(message)
     return message
 
 def element_to_message(element):
     if not isinstance(element, Curve25519Element):
         raise TypeError("Attempted to convert a non-element to a message")
-    element = bytes2int(element, endian='little')
-    element &= bytes2int('\xf8'+'\xff'*30+'\x3f', endian='little')
-    element >>= 3
-    element = int2bytes(element, endian='little')
     length, consumed = decode_varint(element, endian='little')
     element = element[:length]
     return element
 
 class Curve25519ElGamalKey(object):
+    # TODO: allow hashing of the shared secret before multiplication
+    # TODO: use namedtuples for ciphertexts
+    """Implements encoding-free multiplicative ElGamal encryption as described in
+    Encoding-Free ElGamal Encryption Without Random Oracles"""
     __metaclass__ = ImmutableEnforcerMeta
     def __init__(self, _pubkey=None, _seckey=None):
         if _pubkey is not None:
@@ -56,8 +48,8 @@ class Curve25519ElGamalKey(object):
     def encrypt(self, message, random=random):
         if not isinstance(message, Curve25519Element):
             message = message_to_element(message)
-        # r is a random group element
-        r = Curve25519Element(random.getrandbits(32*8))
+        # r is a random element of the subgroun Z_q
+        r = Curve25519SubElement(random.getrandbits(32*8))
         # c1 = g^r
         c1 = curve(r, base)
         # c2 = pubkey^r = g^(seckey * r)
@@ -77,7 +69,7 @@ class Curve25519ElGamalKey(object):
 
     @classmethod
     def generate(cls, random=random):
-        return cls.from_seckey(int2bytes(random.getrandbits(32*8), length=32, endian='little'))
+        return cls.from_seckey(random.getrandbits(32*8))
     @classmethod
     def from_pubkey(cls, pubkey):
         if reduce(or_, imap(lambda bad: secure_compare(pubkey, bad), bad_public_keys)):
@@ -86,8 +78,7 @@ class Curve25519ElGamalKey(object):
             return cls(_pubkey=Curve25519Point(pubkey))
     @classmethod
     def from_seckey(cls, seckey):
-        seckey = _curve25519.make_seckey(seckey)
-        return cls(_seckey=Curve25519Element(seckey))
+        return cls(_seckey=Curve25519SubElement(seckey))
     @classmethod
     def from_privkey(cls, privkey):
         return cls.from_seckey(privkey)
@@ -110,7 +101,7 @@ class Curve25519ElGamalKey(object):
         return self._seckey
     @seckey.setter
     def seckey(self, seckey):
-        assert isinstance(seckey, Curve25519Element)
+        assert isinstance(seckey, Curve25519SubElement)
         self._seckey = seckey
 
 
