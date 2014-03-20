@@ -45,7 +45,6 @@ Curve25519CipherText = namedtuple("Curve25519CipherText", ["locks", "box"])
 
 class Curve25519ElGamalKey(object):
     # TODO: allow hashing of the shared secret before multiplication
-    # TODO: allow customization of the message<->element conversion
     """Implements encoding-free multiplicative ElGamal encryption as described in
     Encoding-Free ElGamal Encryption Without Random Oracles by Chevallier-Mames et.al.
     over Curve25519 as described in
@@ -138,6 +137,11 @@ class Curve25519ElGamalKey(object):
     def seckey(self, seckey):
         assert isinstance(seckey, Curve25519SubElement)
         self._seckey = seckey
-
+    @property
+    def privkey(self):
+        return self.seckey
+    @privkey.setter
+    def privkey(self, privkey):
+        self.seckey = privkey
 
 __all__ = ['Curve25519ElGamalKey', 'Curve25519PlainText', 'Curve25519CipherText']
