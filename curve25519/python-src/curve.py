@@ -3,26 +3,26 @@ from intbytes import int2bytes, bytes2int
 from numbers import Integral
 
 def curve(element, point):
-    assert isinstance(element, Curve25519SubElement)
-    assert isinstance(point, Curve25519Point)
-    return Curve25519Point(_curve25519.curve(element, point))
+    assert isinstance(element, SubElement)
+    assert isinstance(point, Point)
+    return Point(_curve25519.curve(element, point))
 
-class Curve25519Point(bytes):
+class Point(bytes):
     """Class representing the x coordinate of points on Curve25519"""
     def __new__(cls, x):
         if isinstance(x, Integral):
             x = int2bytes(x, length=32, endian='little')
         if not isinstance(x, bytes):
-            raise TypeError("Can only instantiate Curve25519Point instances from integers or bytes")
-        return super(Curve25519Point, cls).__new__(cls, x)
+            raise TypeError("Can only instantiate Point instances from integers or bytes")
+        return super(Point, cls).__new__(cls, x)
     def __mul__(self, other):
-        if not isinstance(other, Curve25519Element):
+        if not isinstance(other, Element):
             raise TypeError("Points can only be multiplied by elements")
-        return Curve25519Point(_curve25519.curve(other, self))
+        return Point(_curve25519.curve(other, self))
     def __rmul__(self, other):
         return self * other
 
-class Curve25519Element(bytes):
+class Element(bytes):
     """Class representing elements of the field Z_p"""
     def __new__(cls, x):
         if isinstance(x, Integral):
@@ -31,40 +31,40 @@ class Curve25519Element(bytes):
                           endian='little')
         elif isinstance(x, bytes):
             if len(x) != 32:
-                raise ValueError("When instantiating Curve25519Element from bytes, argument must be of length 32")
+                raise ValueError("When instantiating Element from bytes, argument must be of length 32")
             x = int2bytes(bytes2int(x, endian='little') % bytes2int(p, endian='little'),
                           length=32,
                           endian='little')
         else:
-            raise TypeError("Can only instantiate Curve25519Element instances from integers or bytes")
-        return super(Curve25519Element, cls).__new__(cls, x)
+            raise TypeError("Can only instantiate Element instances from integers or bytes")
+        return super(Element, cls).__new__(cls, x)
     def __mul__(self, other):
-        if not isinstance(other, Curve25519Element):
-            raise TypeError("Multiplication is only defined on Curve25519Element's")
-        return Curve25519Element(_curve25519.mul(self, other))
+        if not isinstance(other, Element):
+            raise TypeError("Multiplication is only defined on Element's")
+        return Element(_curve25519.mul(self, other))
     def __rmul__(self, other):
         return self * other
     def __div__(self, other):
-        if not isinstance(other, Curve25519Element):
-            raise TypeError("Division is only defined on Curve25519Element's")
-        return Curve25519Element(_curve25519.mul(self, _curve25519.recip(other)))
+        if not isinstance(other, Element):
+            raise TypeError("Division is only defined on Element's")
+        return Element(_curve25519.mul(self, _curve25519.recip(other)))
     def __rdiv__(self, other):
-        if not isinstance(other, Curve25519Element):
-            raise TypeError("Division is only defined on Curve25519Element's")
-        return Curve25519Element(_curve25519.mul(_curve25519.recip(self), other))
+        if not isinstance(other, Element):
+            raise TypeError("Division is only defined on Element's")
+        return Element(_curve25519.mul(_curve25519.recip(self), other))
 
-class Curve25519SubElement(Curve25519Element):
-    """Class representing elements of the sub-field of Z_p that generate the points of Curve25519"""
+class SubElement(Element):
+    """Class representing values of n for which it is safe to calculate n*G on Curve25519 (where G is the base point)"""
     def __new__(cls, x):
         if isinstance(x, Integral):
             x = _curve25519.make_seckey(int2bytes(x, length=32, endian='little'))
         elif isinstance(x, bytes):
             if len(x) != 32:
-                raise ValueError("When instantiating Curve25519SubElement from bytes, argument must be of length 32")
+                raise ValueError("When instantiating SubElement from bytes, argument must be of length 32")
             x = _curve25519.make_seckey(x)
         else:
-            raise TypeError("Can only instantiate Curve25519SubElement instances from integers or bytes")
-        return super(Curve25519SubElement, cls).__new__(cls, x)
+            raise TypeError("Can only instantiate SubElement instances from integers or bytes")
+        return super(SubElement, cls).__new__(cls, x)
 
 
 p = 2**255 - 19 # curve is defined over the field Z_p
@@ -84,8 +84,8 @@ bad_public_keys = [0,
                    2*p + 1]
 p = int2bytes(p, length=32, endian='little')
 q = int2bytes(q, length=32, endian='little')
-base = Curve25519Point(base)
-bad_public_keys = map(Curve25519Point,
+base = Point(base)
+bad_public_keys = map(Point,
                       bad_public_keys)
     
-__all__ = ['p','q','base','bad_public_keys','curve','Curve25519Point','Curve25519Element','Curve25519SubElement']
+__all__ = ['p','q','base','bad_public_keys','curve','Point','Element','SubElement']
