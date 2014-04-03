@@ -589,12 +589,15 @@ swap_conditional(limb a[19], limb b[19], limb iswap) {
 
 /* Calculates nQ where Q is the x-coordinate of a point on the curve
  *
- *   resultx/resultz: the x coordinate of the resulting curve point (short form)
+ *   nQx/nQz: the x coordinate of the resulting curve point (short form)
+ *   noneQx/noneQz: the x coordinate of the point (n+1)Q (short form)
  *   n: a little endian, 32-byte number
  *   q: a point of the curve (short form)
  */
 static void
-cmult(limb *resultx, limb *resultz, const u8 *n, const limb *q) {
+cmult(limb *nQx, limb *nQz,
+      limb *noneQx, limb *noneQz,
+      const u8 *n, const limb *q) {
   limb a[19] = {0}, b[19] = {1}, c[19] = {1}, d[19] = {0};
   limb *nqpqx = a, *nqpqz = b, *nqx = c, *nqz = d, *t;
   limb e[19] = {0}, f[19] = {1}, g[19] = {0}, h[19] = {1};
@@ -604,11 +607,38 @@ cmult(limb *resultx, limb *resultz, const u8 *n, const limb *q) {
 
   memcpy(nqpqx, q, sizeof(limb) * 10);
 
+#define F(aa, bb, cc, dd, ee, ff, gg, hh, ii) \
+  swap_conditional(cc, aa, ii); \
+  swap_conditional(dd, bb, ii); \
+  fmonty(gg, hh, \
+         ee, ff, \
+         cc, dd, \
+         aa, bb, \
+         q); \
+  swap_conditional(gg, ee, ii); \
+  swap_conditional(hh, ff, ii); \
+   \
+  t = cc; \
+  cc = gg; \
+  gg = t; \
+  t = dd; \
+  dd = hh; \
+  hh = t; \
+  t = aa; \
+  aa = ee; \
+  ee = t; \
+  t = bb; \
+  bb = ff; \
+  ff = t;
+
   for (i = 0; i < 32; ++i) {
     u8 byte = n[31 - i];
     for (j = 0; j < 8; ++j) {
       const limb bit = byte >> 7;
 
+      F(nqpqx, nqpqz, nqx, nqz, nqpqx2, nqpqz2, nqx2, nqz2, bit);
+
+      /*
       swap_conditional(nqx, nqpqx, bit);
       swap_conditional(nqz, nqpqz, bit);
       fmonty(nqx2, nqz2,
@@ -631,13 +661,22 @@ cmult(limb *resultx, limb *resultz, const u8 *n, const limb *q) {
       t = nqpqz;
       nqpqz = nqpqz2;
       nqpqz2 = t;
+      */
 
       byte <<= 1;
     }
   }
 
-  memcpy(resultx, nqx, sizeof(limb) * 10);
-  memcpy(resultz, nqz, sizeof(limb) * 10);
+  memcpy(nQx, nqx, sizeof(limb) * 10);
+  memcpy(nQz, nqz, sizeof(limb) * 10);
+
+  /* TODO: this is probably wrong */
+  F(nqpqx, nqpqz, nqx, nqz, nqpqx2, nqpqz2, nqx2, nqz2, 1);
+
+  memcpy(noneQx, nqx, sizeof(limb) * 10);
+  memcpy(noneQz, nqz, sizeof(limb) * 10);
+
+#undef F
 }
 
 // -----------------------------------------------------------------------------
@@ -730,9 +769,117 @@ recip(u8 *output, const u8* z) {
   return crecip((limb *)output, (const limb *)z);
 }
 
+void
+double_scalarmult_vartime(limb *outx, limb *outz,
+                          const limb *s1, const limb *P1,
+                          const limb *s2, const limb *P2,
+                          const limb *bpx, const limb *bpy) {
+  limb soneP1x[10], soneP1z[10];
+  limb soneP2x[10], soneP2z[10];
+  limb sP1x[10], sP1y[10], sP1z[10];
+  limb sP2x[10], sP2y[10], sP2z[10];
+  limb t[10];
+
+  cmult(sP1x, sP1z,
+        soneP1x, soneP1z,
+        s1, P1);
+  cmult(sP2x, sP2z,
+        soneP2x, soneP2z,
+        s2, P2);
+  /* TODO: probably unsafe */
+  yrecover(sP1x, sP1y, sP1z,
+           sP1x, sP1x,
+           soneP1x, soneP1z,
+           bpx, bpy);
+  yrecover(sP2x, sP2y, sP2z,
+           sP2x, sP2x,
+           soneP2x, soneP2z,
+           bpx, bpy);
+
+  /* TODO: use fdifference where appropriate */
+
+  /* reusing soneP{1,2}{x,z} as temporaries */
+  fmul(soneP1x, sP2x, sP1y);
+  fmul(soneP1z, sP1x, sP2y);
+  fdifference(soneP1x, soneP1z);
+  fsquare(soneP1z, soneP1x);
+  fmul(soneP1x, sP1z, soneP1z);
+  fmul(soneP1z, sP2z, soneP1x);
+  /* soneP1z = sP1z * sP2z * (sP2x * sP1y - sP1x * sP2y) ** 2 */
+  memcpy(outx, soneP1z, sizeof(limb) * 10);
+
+
+  fmul(soneP2x, sP2x, sP1z);
+  fmul(soneP2z, sP1x, sP2z);
+  fdifference(soneP2x, soneP2z);
+  fsquare(soneP2z, soneP2x);
+  fmul(soneP2x, sP1x, soneP2z);
+  fmul(soneP2z, sP2x, soneP2x);
+  /* soneP2z = sP1x * sP2x * (sP2x * sP1z - sP1x * sP2z) ** 2 */
+  memcpy(outz, soneP2z, sizeof(limb) * 10);
+}
+
+void
+yrecover(limb *outx, limb *outy, limb *outz,
+         const limb *x, const limb *z,
+         const limb *xone, const limb *zone,
+         const limb *bpx, const limb *bpy) {
+  limb t1[10], t2[10], t3[10], t4[10];
+
+  /* TODO: use fproduct where appropriate */
+
+  /* t1 <- x * bpx - z */
+  fmul(t2, x, bpx);
+  memcpy(t1, z, sizeof(limb)*10);
+  fdifference(t1, t2);
+
+  /* t2 <- x - z * bpx */
+  fmul(t2, z, bpx)
+  fdifference(t2, x);
+
+  /* t3 <- zone * t1 */
+  fmul(t3, zone, t1);
+
+  /* t4 <- xone * t2 */
+  fmul(t4, xone, t2);
+
+  /* t1 <- t1**2 */
+  /* TODO: maybe unsafe? */
+  fsquare(t1, t1);
+
+  /* t2 <- t2**2 * z * xone * zone * bpy */
+  /* TODO: maybe unsafe? */
+  fsquare(t2, t2);
+  fmul(t2, t2, z);
+  fmul(t2, t2, xone);
+  fmul(t2, t2, zone);
+  fmul(t2, t2, bpy);
+
+  /* outx <- t2 * x */
+  fmul(outx, t2, x);
+
+  /* outz <- t2 * z */
+  fmul(outz, t2, z)
+
+  /* t2 <- t3 + t4 */
+  memcpy(t2, t3, sizeof(limb));
+  fsum(t2, t4);
+
+  /* t4 <- t3 - t4 */
+  fdifference(t4, t3);
+
+  /* t1 <- t1 * t2 */
+  /* TODO: maybe unsafe? */
+  fmul(t1, t1, t2);
+
+  /* outy <- t1 * t4 */
+  fmul(outy, t1, t4);
+}
+
 int
 curve25519_donna(u8 *mypublic, const u8 *secret, const u8 *basepoint) {
   limb bp[10], x[10], z[11], zmone[10];
+  limb xone[10], zone[10];
   uint8_t e[32];
   int i;
 
@@ -742,7 +889,7 @@ curve25519_donna(u8 *mypublic, const u8 *secret, const u8 *basepoint) {
   e[31] |= 64;
 
   fexpand(bp, basepoint);
-  cmult(x, z, e, bp);
+  cmult(x, z, xone, zone, e, bp);
   crecip(zmone, z);
   fmul(z, x, zmone);
   freduce_coefficients(z);
