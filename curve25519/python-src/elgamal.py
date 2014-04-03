@@ -31,6 +31,7 @@ def element_to_string(element):
 
 class PlainText(Element):
     def __new__(cls, x):
+        # TODO: the > comparison may leak timing information about plaintexts
         if (isinstance(x, Integral) and x > bytes2int(p, endian='little'))\
                or (isinstance(x, bytes) and bytes2int(x, endian='little') > bytes2int(p, endian='little')):
             raise ValueError("message too large/long to fit into a plaintext")
@@ -50,11 +51,13 @@ class ElGamalKey(Key):
             raise TypeError("Argument message must be a Element, PlainText, or CipherText instance")
         # r is a random element of the subgroun Z_q
         r = SubElement(random.getrandbits(32*8))
-        # lock = g^r
+        # lock = r*G
         lock = curve(r, base)
-        # c = pubkey^r = g^(seckey * r)
+        # c = r*pubkey = r*seckey*G
         c = curve(r, self.pubkey)
-        # box = message*c = message * g^(seckey * r)
+
+        # convert c to a scalar
+        # box = message*c = message * scalar(r*seckey*G)
         if isinstance(message, CipherText):
             if self.pubkey in message.locks:
                 # below is approximately what ought to happen instead of throwing an error
@@ -76,9 +79,10 @@ class ElGamalKey(Key):
         if not (isinstance(lock, Point) and isinstance(box, Element)):
             raise TypeError("Invalid ciphertext")
 
-        # unlocked = lock^seckey = g^(seckey * r)
+        # unlocked = lock*seckey = r*seckey*G
         unlocked = curve(self.seckey, lock)
-        # m = box/lock = original * g^(seckey * r) * g^(seckey * r)^-1 = original
+        # flatten unlocked to a scalar
+        # m = box/lock = original * scalar(r*seckey*G) * scalar(r*seckey*G)^-1 = original
         m = box / Element(unlocked)
         if len(message.locks) == 1:
             return PlainText(m)
