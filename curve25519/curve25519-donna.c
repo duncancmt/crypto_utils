@@ -749,77 +749,7 @@ crecip(limb *out, const limb *z) {
   /* 2^255 - 21 */ fmul(out,t1,z11);
 }
 
-void
-mul(u8 *output, const u8 *in, const u8 *in2) {
-  fmul((limb *)output, (const limb *)in, (const limb *)in2);
-}
-
-void
-expand(u8 *output, const u8 *in) {
-  fexpand((limb *)output, (const u8 *)in);
-}
-
-void
-contract(u8 *output, const u8 *in) {
-  fcontract((u8 *)output, (limb *)in);
-}
-
-int
-recip(u8 *output, const u8* z) {
-  return crecip((limb *)output, (const limb *)z);
-}
-
-void
-double_scalarmult_vartime(limb *outx, limb *outz,
-                          const limb *s1, const limb *P1,
-                          const limb *s2, const limb *P2,
-                          const limb *bpx, const limb *bpy) {
-  limb soneP1x[10], soneP1z[10];
-  limb soneP2x[10], soneP2z[10];
-  limb sP1x[10], sP1y[10], sP1z[10];
-  limb sP2x[10], sP2y[10], sP2z[10];
-  limb t[10];
-
-  cmult(sP1x, sP1z,
-        soneP1x, soneP1z,
-        s1, P1);
-  cmult(sP2x, sP2z,
-        soneP2x, soneP2z,
-        s2, P2);
-  /* TODO: probably unsafe */
-  yrecover(sP1x, sP1y, sP1z,
-           sP1x, sP1x,
-           soneP1x, soneP1z,
-           bpx, bpy);
-  yrecover(sP2x, sP2y, sP2z,
-           sP2x, sP2x,
-           soneP2x, soneP2z,
-           bpx, bpy);
-
-  /* TODO: use fdifference where appropriate */
-
-  /* reusing soneP{1,2}{x,z} as temporaries */
-  fmul(soneP1x, sP2x, sP1y);
-  fmul(soneP1z, sP1x, sP2y);
-  fdifference(soneP1x, soneP1z);
-  fsquare(soneP1z, soneP1x);
-  fmul(soneP1x, sP1z, soneP1z);
-  fmul(soneP1z, sP2z, soneP1x);
-  /* soneP1z = sP1z * sP2z * (sP2x * sP1y - sP1x * sP2y) ** 2 */
-  memcpy(outx, soneP1z, sizeof(limb) * 10);
-
-
-  fmul(soneP2x, sP2x, sP1z);
-  fmul(soneP2z, sP1x, sP2z);
-  fdifference(soneP2x, soneP2z);
-  fsquare(soneP2z, soneP2x);
-  fmul(soneP2x, sP1x, soneP2z);
-  fmul(soneP2z, sP2x, soneP2x);
-  /* soneP2z = sP1x * sP2x * (sP2x * sP1z - sP1x * sP2z) ** 2 */
-  memcpy(outz, soneP2z, sizeof(limb) * 10);
-}
-
-void
+static void
 yrecover(limb *outx, limb *outy, limb *outz,
          const limb *x, const limb *z,
          const limb *xone, const limb *zone,
@@ -874,6 +804,76 @@ yrecover(limb *outx, limb *outy, limb *outz,
 
   /* outy <- t1 * t4 */
   fmul(outy, t1, t4);
+}
+
+static void
+double_scalarmult_vartime(limb *outx, limb *outz,
+                          const limb *s1, const limb *P1,
+                          const limb *s2, const limb *P2,
+                          const limb *bpx, const limb *bpy) {
+  limb soneP1x[10], soneP1z[10];
+  limb soneP2x[10], soneP2z[10];
+  limb sP1x[10], sP1y[10], sP1z[10];
+  limb sP2x[10], sP2y[10], sP2z[10];
+  limb t[10];
+
+  cmult(sP1x, sP1z,
+        soneP1x, soneP1z,
+        s1, P1);
+  cmult(sP2x, sP2z,
+        soneP2x, soneP2z,
+        s2, P2);
+  /* TODO: probably unsafe */
+  yrecover(sP1x, sP1y, sP1z,
+           sP1x, sP1x,
+           soneP1x, soneP1z,
+           bpx, bpy);
+  yrecover(sP2x, sP2y, sP2z,
+           sP2x, sP2x,
+           soneP2x, soneP2z,
+           bpx, bpy);
+
+  /* TODO: use fdifference where appropriate */
+
+  /* reusing soneP{1,2}{x,z} as temporaries */
+  fmul(soneP1x, sP2x, sP1y);
+  fmul(soneP1z, sP1x, sP2y);
+  fdifference(soneP1x, soneP1z);
+  fsquare(soneP1z, soneP1x);
+  fmul(soneP1x, sP1z, soneP1z);
+  fmul(soneP1z, sP2z, soneP1x);
+  /* soneP1z = sP1z * sP2z * (sP2x * sP1y - sP1x * sP2y) ** 2 */
+  memcpy(outx, soneP1z, sizeof(limb) * 10);
+
+
+  fmul(soneP2x, sP2x, sP1z);
+  fmul(soneP2z, sP1x, sP2z);
+  fdifference(soneP2x, soneP2z);
+  fsquare(soneP2z, soneP2x);
+  fmul(soneP2x, sP1x, soneP2z);
+  fmul(soneP2z, sP2x, soneP2x);
+  /* soneP2z = sP1x * sP2x * (sP2x * sP1z - sP1x * sP2z) ** 2 */
+  memcpy(outz, soneP2z, sizeof(limb) * 10);
+}
+
+void
+mul(u8 *output, const u8 *in, const u8 *in2) {
+  fmul((limb *)output, (const limb *)in, (const limb *)in2);
+}
+
+void
+expand(u8 *output, const u8 *in) {
+  fexpand((limb *)output, (const u8 *)in);
+}
+
+void
+contract(u8 *output, const u8 *in) {
+  fcontract((u8 *)output, (limb *)in);
+}
+
+int
+recip(u8 *output, const u8* z) {
+  return crecip((limb *)output, (const limb *)z);
 }
 
 int
