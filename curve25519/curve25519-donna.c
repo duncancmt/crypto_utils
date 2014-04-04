@@ -804,10 +804,10 @@ yrecover(limb *outx, limb *outy, limb *outz,
 }
 
 static void
-double_scalarmult_vartime(limb *outx, limb *outz,
-                          const limb *s1, const limb *P1,
-                          const limb *s2, const limb *P2,
-                          const limb *bpx, const limb *bpy) {
+double_scalarmult(limb *outx, limb *outz,
+                  const limb *s1, const limb *P1,
+                  const limb *s2, const limb *P2,
+                  const limb *bpx, const limb *bpy) {
   limb soneP1x[10], soneP1z[10];
   limb soneP2x[10], soneP2z[10];
   limb sP1x[10], sP1y[10], sP1z[10];
