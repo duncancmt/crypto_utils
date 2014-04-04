@@ -754,56 +754,53 @@ yrecover(limb *outx, limb *outy, limb *outz,
          const limb *x, const limb *z,
          const limb *xone, const limb *zone,
          const limb *bpx, const limb *bpy) {
-  limb t1[10], t2[10], t3[10], t4[10];
+  limb t1[10], t2[10], t3[10], t4[10], t5[10];
 
   /* TODO: use fproduct where appropriate */
 
-  /* t1 <- x * bpx - z */
-  fmul(t2, x, bpx);
-  memcpy(t1, z, sizeof(limb)*10);
-  fdifference(t1, t2);
+  /* t2 <- x * bpx - z */
+  fmul(t1, x, bpx);
+  memcpy(t2, z, sizeof(limb)*10);
+  fdifference(t2, t1);
 
-  /* t2 <- x - z * bpx */
-  fmul(t2, z, bpx)
-  fdifference(t2, x);
+  /* t3 <- x - z * bpx */
+  fmul(t3, z, bpx)
+  fdifference(t3, x);
 
-  /* t3 <- zone * t1 */
-  fmul(t3, zone, t1);
+  /* t4 <- zone * t2 */
+  fmul(t4, zone, t2);
 
-  /* t4 <- xone * t2 */
-  fmul(t4, xone, t2);
+  /* t5 <- t2**2 */
+  fsquare(t5, t2);
 
-  /* t1 <- t1**2 */
-  /* TODO: maybe unsafe? */
-  fsquare(t1, t1);
+  /* t2 <- xone * t3 */
+  fmul(t2, xone, t3);
 
-  /* t2 <- t2**2 * z * xone * zone * bpy */
-  /* TODO: maybe unsafe? */
-  fsquare(t2, t2);
-  fmul(t2, t2, z);
-  fmul(t2, t2, xone);
-  fmul(t2, t2, zone);
-  fmul(t2, t2, bpy);
+  /* t1 <- t3**2 * z * xone * zone * bpy */
+  fsquare(t1, t3);
+  fmul(t3, t1, z);
+  fmul(t1, t3, xone);
+  fmul(t3, t1, zone);
+  fmul(t1, t3, bpy);
 
-  /* outx <- t2 * x */
-  fmul(outx, t2, x);
+  /* outx <- t1 * x */
+  fmul(outx, t1, x);
 
-  /* outz <- t2 * z */
-  fmul(outz, t2, z)
+  /* outz <- t1 * z */
+  fmul(outz, t1, z)
 
-  /* t2 <- t3 + t4 */
-  memcpy(t2, t3, sizeof(limb));
-  fsum(t2, t4);
+  /* t1 <- t4 + t2 */
+  memcpy(t1, t4, sizeof(limb));
+  fsum(t1, t2);
 
-  /* t4 <- t3 - t4 */
-  fdifference(t4, t3);
+  /* t2 <- t4 - t2 */
+  fdifference(t2, t4);
 
-  /* t1 <- t1 * t2 */
-  /* TODO: maybe unsafe? */
-  fmul(t1, t1, t2);
+  /* t4 <- t5 * t1 */
+  fmul(t4, t5, t1);
 
-  /* outy <- t1 * t4 */
-  fmul(outy, t1, t4);
+  /* outy <- t5 * t2 */
+  fmul(outy, t4, t2);
 }
 
 static void
