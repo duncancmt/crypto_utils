@@ -801,6 +801,8 @@ yrecover(limb *outx, limb *outy, limb *outz,
 
   /* outy <- t5 * t2 */
   fmul(outy, t4, t2);
+
+  /* TODO: select the appropriate y coordinate */
 }
 
 static void
@@ -830,7 +832,7 @@ double_scalarmult(limb *outx, limb *outz,
            soneP2x, soneP2z,
            bpx, bpy);
 
-  /* TODO: use fdifference where appropriate */
+  /* TODO: use fproduct where appropriate */
 
   fmul(t1, sP2x, sP1y);
   fmul(t2, sP1x, sP2y);
@@ -838,7 +840,7 @@ double_scalarmult(limb *outx, limb *outz,
   fsquare(t2, t1);
   fmul(t1, sP1z, t2);
   fmul(outx, sP2z, t1);
-  /* outx = sP1z * sP2z * (sP2x * sP1y - sP1x * sP2y) ** 2 */
+  /* outx <- sP1z * sP2z * (sP2x * sP1y - sP1x * sP2y) ** 2 */
 
   fmul(t1, sP2x, sP1z);
   fmul(t2, sP1x, sP2z);
@@ -846,7 +848,7 @@ double_scalarmult(limb *outx, limb *outz,
   fsquare(t2, t1);
   fmul(t1, sP1x, t2);
   fmul(outz, sP2x, t1);
-  /* outz = sP1x * sP2x * (sP2x * sP1z - sP1x * sP2z) ** 2 */
+  /* outz <- sP1x * sP2x * (sP2x * sP1z - sP1x * sP2z) ** 2 */
 }
 
 void
