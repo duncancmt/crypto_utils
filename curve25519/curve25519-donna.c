@@ -812,45 +812,41 @@ double_scalarmult_vartime(limb *outx, limb *outz,
   limb soneP2x[10], soneP2z[10];
   limb sP1x[10], sP1y[10], sP1z[10];
   limb sP2x[10], sP2y[10], sP2z[10];
-  limb t[10];
+  limb t1[10], t2[10];
 
-  cmult(sP1x, sP1z,
+  cmult(t1, t2,
         soneP1x, soneP1z,
         s1, P1);
-  cmult(sP2x, sP2z,
-        soneP2x, soneP2z,
-        s2, P2);
-  /* TODO: probably unsafe */
   yrecover(sP1x, sP1y, sP1z,
-           sP1x, sP1x,
+           t1, t2,
            soneP1x, soneP1z,
            bpx, bpy);
+
+  cmult(t1, t2,
+        soneP2x, soneP2z,
+        s2, P2);
   yrecover(sP2x, sP2y, sP2z,
-           sP2x, sP2x,
+           t1, t2,
            soneP2x, soneP2z,
            bpx, bpy);
 
   /* TODO: use fdifference where appropriate */
 
-  /* reusing soneP{1,2}{x,z} as temporaries */
-  fmul(soneP1x, sP2x, sP1y);
-  fmul(soneP1z, sP1x, sP2y);
-  fdifference(soneP1x, soneP1z);
-  fsquare(soneP1z, soneP1x);
-  fmul(soneP1x, sP1z, soneP1z);
-  fmul(soneP1z, sP2z, soneP1x);
-  /* soneP1z = sP1z * sP2z * (sP2x * sP1y - sP1x * sP2y) ** 2 */
-  memcpy(outx, soneP1z, sizeof(limb) * 10);
+  fmul(t1, sP2x, sP1y);
+  fmul(t2, sP1x, sP2y);
+  fdifference(t1, t2);
+  fsquare(t2, t1);
+  fmul(t1, sP1z, t2);
+  fmul(outx, sP2z, t1);
+  /* outx = sP1z * sP2z * (sP2x * sP1y - sP1x * sP2y) ** 2 */
 
-
-  fmul(soneP2x, sP2x, sP1z);
-  fmul(soneP2z, sP1x, sP2z);
-  fdifference(soneP2x, soneP2z);
-  fsquare(soneP2z, soneP2x);
-  fmul(soneP2x, sP1x, soneP2z);
-  fmul(soneP2z, sP2x, soneP2x);
-  /* soneP2z = sP1x * sP2x * (sP2x * sP1z - sP1x * sP2z) ** 2 */
-  memcpy(outz, soneP2z, sizeof(limb) * 10);
+  fmul(t1, sP2x, sP1z);
+  fmul(t2, sP1x, sP2z);
+  fdifference(t1, t2);
+  fsquare(t2, t1);
+  fmul(t1, sP1x, t2);
+  fmul(outz, sP2x, t1);
+  /* outz = sP1x * sP2x * (sP2x * sP1z - sP1x * sP2z) ** 2 */
 }
 
 void
