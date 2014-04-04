@@ -2,7 +2,6 @@
 #define CURVE25519_DONNA
 
 typedef uint8_t u8;
-typedef uint64_t limb;
 
 extern void mul(u8 *, const u8 *, const u8 *);
 extern void expand(u8 *, const u8 *);

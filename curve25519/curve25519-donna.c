@@ -51,6 +51,7 @@
 #include "curve25519-donna.h"
 
 typedef int32_t s32;
+typedef int64_t limb;
 
 #ifdef _MSC_VER
 #define inline __inline
@@ -764,7 +765,7 @@ yrecover(limb *outx, limb *outy, limb *outz,
   fdifference(t2, t1);
 
   /* t3 <- x - z * bpx */
-  fmul(t3, z, bpx)
+  fmul(t3, z, bpx);
   fdifference(t3, x);
 
   /* t4 <- zone * t2 */
@@ -787,7 +788,7 @@ yrecover(limb *outx, limb *outy, limb *outz,
   fmul(outx, t1, x);
 
   /* outz <- t1 * z */
-  fmul(outz, t1, z)
+  fmul(outz, t1, z);
 
   /* t1 <- t4 + t2 */
   memcpy(t1, t4, sizeof(limb));
@@ -807,8 +808,8 @@ yrecover(limb *outx, limb *outy, limb *outz,
 
 static void
 double_scalarmult(limb *outx, limb *outz,
-                  const limb *s1, const limb *P1,
-                  const limb *s2, const limb *P2,
+                  const u8 *s1, const limb *P1,
+                  const u8 *s2, const limb *P2,
                   const limb *bpx, const limb *bpy) {
   limb soneP1x[10], soneP1z[10];
   limb soneP2x[10], soneP2z[10];
@@ -866,7 +867,7 @@ contract(u8 *output, const u8 *in) {
   fcontract((u8 *)output, (limb *)in);
 }
 
-int
+void
 recip(u8 *output, const u8* z) {
   return crecip((limb *)output, (const limb *)z);
 }

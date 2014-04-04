@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include "curve25519-donna.h"
 
+typedef uint64_t limb;
 typedef limb felem[5];
 // This is a special gcc mode for 128-bit integers. It's implemented on 64-bit
 // platforms only as far as I know.
