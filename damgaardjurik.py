@@ -204,16 +204,16 @@ class DamgaardJurik(object):
 
     @property
     def n(self):
-        return self._n
+        return self.__n
     @n.setter
     def n(self, value):
-        self._n = value
+        self.__n = value
     @property
     def l(self):
-        return self._l
+        return self.__l
     @l.setter
     def l(self, value):
-        self._l = value
+        self.__l = value
 
     @classmethod
     def from_pubkey(cls, pubkey):
@@ -298,38 +298,38 @@ class DamgaardJurikCiphertext(DamgaardJurikCiphertextBase, Integral):
 
     @property
     def c(self):
-        return self._c
+        return self.__c
     @c.setter
     def c(self, value):
-        self._c = value
+        self.__c = value
 
     @property
     def key(self):
-        return self._key
+        return self.__key
     @key.setter
     def key(self, value):
-        self._key = value
+        self.__key = value
 
     @property
     def s(self):
-        return self._s
+        return self.__s
     @s.setter
     def s(self, value):
-        self._s = value
+        self.__s = value
 
     @property
     def ns1(self):
-        return self._ns1
+        return self.__ns1
     @ns1.setter
     def ns1(self, value):
-        self._ns1 = value
+        self.__ns1 = value
 
     @property
     def cache(self):
-        return self._cache
+        return self.__cache
     @cache.setter
     def cache(self, value):
-        self._cache = value
+        self.__cache = value
 
     def populate_cache(self):
         """When caching of powers is enabled, populate the cache as appropriate.
