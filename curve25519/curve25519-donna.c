@@ -57,6 +57,18 @@ typedef int64_t limb;
 #define inline __inline
 #endif
 
+static const limb base_point_y[10] = {9}
+static const limb base_point_y[10] = {0x0000000002ced3d9,
+                                      0x000000000071689f,
+                                      0x000000000036453d,
+                                      0x0000000001f36be3,
+                                      0x000000000248f535,
+                                      0x000000000148d14c,
+                                      0x00000000036e963b,
+                                      0x0000000000d69c03,
+                                      0x00000000021b8a08,
+                                      0x000000000082b866}
+
 /* Field element representation:
  *
  * Field elements are written as an array of signed, 64-bit limbs, least
