@@ -6,6 +6,7 @@ from itertools import imap, izip, count, chain
 from intbytes import int2bytes, bytes2int, encode_varint, decode_varint
 from math import log, floor, ceil
 from keccak import Keccak
+from memoize import memoize
 
 for path in sys.path + [None]:
     if path is None:
@@ -235,6 +236,7 @@ def randomart(s, height=9, width=17, length=64, border=True, tag=''):
                          for row in field)
 
 
+@memoize
 def nCk(n, k):
     """Binomial coefficient function"""
     if n < k or k < 0:
@@ -248,21 +250,14 @@ def nCk(n, k):
             n -= 1
         return ntok // ktok
 
-rank_length_offsets = [None]*len(words)
-rank_length_offsets[0] = 0
-rank_length_offsets[1] = 0
+@memoize
 def get_rank_length_offset(length):
     """Given the length of a unordered encoding,
     return the highest number that can be represented by an encoding 1 shorter."""
-    if rank_length_offsets[length] is None:
-        for i in xrange(length-1, -1, -1):
-            if rank_length_offsets[i] is not None:
-                break
-        for j in xrange(i, length):
-            rank_length_offsets[j+1] = rank_length_offsets[j] + nCk(len(words), j)
-        return get_rank_length_offset(length)
+    if length == 0 or length == 1:
+        return 0
     else:
-        return rank_length_offsets[length]
+        return get_rank_length_offset(length-1) + nCk(len(words), length-1)
 
 def encode_unordered(s, compact=False, checksum=True):
     """From a byte string, produce an unordered set of words that durably encodes the string.
@@ -288,7 +283,6 @@ def encode_unordered(s, compact=False, checksum=True):
             lower = length
         else: # n < minn
             upper = length
-
 
     n -= get_rank_length_offset(length)
     retval = [None] * length
