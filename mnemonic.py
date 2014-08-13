@@ -7,7 +7,9 @@ from intbytes import int2bytes, bytes2int, encode_varint, decode_varint
 from math import log, floor, ceil
 from keccak import Keccak
 
-for path in sys.path:
+for path in sys.path + [None]:
+    if path is None:
+        raise IOError("Could not find words.pkl")
     words_path = os.path.join(path, 'words.pkl')
     if os.path.isfile(words_path):
         break
@@ -53,31 +55,75 @@ def dldist(s, n):
         return set(flatten(imap(onedldist, dldist(s, n-1))))
 
 
-def encode(s, compact=False):
+def pad_and_checksum(s, compact, checksum):
+    """Apply length padding and checksum to a string"""
+    assert isinstance(s, bytes)
+    if checksum:
+        k = Keccak()
+        k.absorb(s)
+        checksum_length = max(1, (len(s)-1).bit_length())
+        checksum = k.squeeze(checksum_length)
+
+        length = chr(checksum_length) if compact else encode_varint(len(s), endian='little')
+        return s + checksum + length
+    else:
+        length = '\x01' if compact else encode_varint(len(s), endian='little')
+        return s + length
+
+def unpad_and_checksum(s, compact, checksum):
+    """Check length padding and checksum for a string
+    return the string without length padding or checksum
+    raise ValueError if either are wrong"""
+    assert isinstance(s, bytes)
+    if checksum:
+        if compact:
+            checksum_length = ord(s[-1])
+            consumed = 1
+            length = len(s) - checksum_length - consumed
+        else:
+            (length, consumed) = decode_varint(s, endian='little')
+            checksum_length = max(1, (length-1).bit_length())
+
+        s = s[:-consumed]
+        s, checksum = s[:-checksum_length], s[-checksum_length:]
+        if len(s) != length:
+            raise ValueError("Invalid length")
+
+        k = Keccak()
+        k.absorb(s)
+        if k.squeeze(checksum_length) != checksum:
+            raise ValueError("Invalid checksum")
+
+        return s
+    else:
+        if compact:
+            return s[:-1]
+        else:
+            (length, consumed) = decode_varint(s, endian='little')
+            s = s[:-consumed]
+            if len(s) != length:
+                raise ValueError("Invalid length")
+            return s
+
+
+def encode(s, compact=False, checksum=True):
     """From a byte string, produce a list of words that durably encodes the string.
 
     s: the byte string to be encoded
-    compact: instead of using the length encoding scheme, pad by prepending a 1 bit
+    compact: instead of using the length encoding scheme, pad by appending a single byte
+    checksum: append a checksum to the byte string before encoding
 
     The words in the encoding dictionary were chosen to be common and unambiguous.
-    The encoding also includes a checksum. The encoding is constructed so that
-    common errors are extremely unlikely to produce a valid encoding.
+    The encoding is constructed so that common errors are extremely unlikely to
+    produce a valid encoding.
     """
     if not isinstance(s, bytes):
         raise TypeError("mnemonic.encode can only encode byte strings")
 
-    k = Keccak()
-    k.absorb(s)
-    checksum_length = max(1, (len(s)-1).bit_length())
-    checksum = k.squeeze(checksum_length)
-
-    length = chr(checksum_length) if compact else encode_varint(len(s), endian='little')
-
-    s += checksum
-    s += length
+    s = pad_and_checksum(s, compact, checksum)
 
     word_index = 0
-    i = bytes2int(s)
+    i = bytes2int(s, endian='little')
     retval = [None] * int(floor(log(i, len(words)) + 1))
     for j in xrange(len(retval)):
         assert i > 0
@@ -88,12 +134,13 @@ def encode(s, compact=False):
     assert i == 0
     return tuple(retval)
 
-def decode(w, compact=False, permissive=False):
+def decode(w, compact=False, checksum=True, permissive=False):
     """From a list of words, or a whitespace-separated string of words, produce
-    the original string that was encoded.
+    the original byte string that was encoded.
 
     w: the list of words, or whitespace delimited words to be decoded
     compact: compact encoding was used instead of length encoding
+    checksum: encoded string had a checksum appended before encoding
     permissive: if there are spelling errors, correct them instead of throwing
         an error (will still throw ValueError if spelling can't be corrected)
 
@@ -121,25 +168,7 @@ def decode(w, compact=False, permissive=False):
                     (0, []))[1]
     i = sum(mantissa * len(words)**radix for radix, mantissa in enumerate(values))
     # we don't need to worry about truncating null bytes because of the encoded length on the end
-    s = int2bytes(i)
-
-    if compact:
-        checksum_length = ord(s[-1])
-        consumed = 1
-        length = len(s) - checksum_length - consumed
-    else:
-        (length, consumed) = decode_varint(s, endian='little')
-        checksum_length = max(1, (length-1).bit_length())
-
-    s = s[:-consumed]
-    s, checksum = s[:-checksum_length], s[-checksum_length:]
-    if len(s) != length:
-        raise ValueError("Invalid length")
-
-    k = Keccak()
-    k.absorb(s)
-    if k.squeeze(checksum_length) != checksum:
-        raise ValueError("Invalid checksum")
+    s = unpad_and_checksum(int2bytes(i, endian='little'), compact, checksum)
 
     return s
 
@@ -162,7 +191,8 @@ def randomart(s, height=9, width=17, length=64, border=True, tag=''):
     k.absorb(s)
     # we reverse the endianness so that increasing length produces a radically
     # different randomart
-    i = bytes2int(reversed(k.squeeze(int(ceil(length / 4.0)))))
+    i = bytes2int(reversed(k.squeeze(int(ceil(length / 4.0)))),
+                  endian='little')
 
     field = [ [0 for _ in xrange(width)]
               for __ in xrange(height) ]
@@ -204,4 +234,114 @@ def randomart(s, height=9, width=17, length=64, border=True, tag=''):
         return '\n'.join(''.join(chars[cell] for cell in row)
                          for row in field)
 
-__all__ = ['encode', 'decode', 'randomart']
+
+def nCk(n, k):
+    """Binomial coefficient function"""
+    if n < k or k < 0:
+        return 0
+    else:
+        ntok = 1
+        ktok = 1
+        for t in xrange(1, min(k, n-k) + 1):
+            ntok *= n
+            ktok *= t
+            n -= 1
+        return ntok // ktok
+
+rank_length_offsets = [None]*len(words)
+rank_length_offsets[0] = 0
+rank_length_offsets[1] = 0
+def get_rank_length_offset(length):
+    """Given the length of a unordered encoding,
+    return the highest number that can be represented by an encoding 1 shorter."""
+    if rank_length_offsets[length] is None:
+        for i in xrange(length-1, -1, -1):
+            if rank_length_offsets[i] is not None:
+                break
+        for j in xrange(i, length):
+            rank_length_offsets[j+1] = rank_length_offsets[j] + nCk(len(words), j)
+        return get_rank_length_offset(length)
+    else:
+        return rank_length_offsets[length]
+
+def encode_unordered(s, compact=False, checksum=True):
+    """From a byte string, produce an unordered set of words that durably encodes the string.
+
+    s: the byte string to be encoded
+    compact: instead of using the length encoding scheme, pad by appending a single byte
+    checksum: append a checksum to the byte string before encoding
+
+    The words in the encoding dictionary were chosen to be common and unambiguous.
+    The encoding is constructed so that common errors are extremely unlikely to
+    produce a valid encoding.
+    """
+    n = bytes2int(pad_and_checksum(s, compact, checksum), endian='little')
+    upper = len(words)+1
+    lower = 0
+    minn = n+1
+    maxn = n
+    while minn > n or n >= maxn:
+        length = (upper + lower) // 2
+        minn = get_rank_length_offset(length)
+        maxn = get_rank_length_offset(length+1)
+        if n >= maxn:
+            lower = length
+        else: # n < minn
+            upper = length
+
+
+    n -= get_rank_length_offset(length)
+    retval = [None] * length
+    for i in xrange(length, 0, -1):
+        upper = len(words)
+        lower = 0
+        minn = n+1
+        maxn = n
+        while minn > n or n >= maxn:
+            c = (upper + lower) // 2
+            minn = nCk(c, i)
+            maxn = nCk(c+1, i)
+            if n >= maxn:
+                lower = c
+            else: # n < minn
+                upper = c
+        retval[i-1] = words[c]
+        n -= nCk(c, i)
+    return frozenset(retval)
+
+
+def decode_unordered(w, compact=False, checksum=True, permissive=False):
+    """From an unordered set of words, or a whitespace-separated string of words, produce
+    the original byte string that was encoded.
+
+    w: the list of words, or whitespace delimited words to be decoded
+    compact: compact encoding was used instead of length encoding
+    checksum: encoded string had a checksum appended before encoding
+    permissive: if there are spelling errors, correct them instead of throwing
+        an error (will still throw ValueError if spelling can't be corrected)
+
+    Raises ValueError if the encoding is invalid.
+    """
+    if isinstance(w, bytes):
+        w = w.split()
+
+    digits = [None]*len(w)
+    for i,word in enumerate(w):
+        if word in rwords:
+            digits[i] = rwords[word]
+        elif permissive:
+            for nearby in dldist(word, 1):
+                if nearby in rwords:
+                    digits[i] = rwords[nearby]
+                    break
+        if digits[i] is None:
+            raise ValueError('Unrecognized word %s' % repr(word))
+
+    digits.sort()
+    n = get_rank_length_offset(len(digits))
+    for i, d in enumerate(digits):
+        n += nCk(d, i+1)
+    s = int2bytes(n, endian='little')
+    return unpad_and_checksum(s, compact, checksum)
+
+__all__ = ['encode', 'decode', 'randomart', 'encode_unordered', 'decode_unordered']
