@@ -306,7 +306,7 @@ def encode_unordered(s, compact=False, checksum=True):
             else: # n < minn
                 upper = c
         retval[i-1] = words[c]
-        n -= nCk(c, i)
+        n -= minn
     return frozenset(retval)
 
 
@@ -345,3 +345,104 @@ def decode_unordered(w, compact=False, checksum=True, permissive=False):
     return unpad_and_checksum(s, compact, checksum)
 
 __all__ = ['encode', 'decode', 'randomart', 'encode_unordered', 'decode_unordered']
+
+if __name__ == '__main__':
+    import random
+    try:
+        iterations = int(sys.argv[1])
+    except:
+        iterations = 1000
+
+    print >>sys.stderr, "\nTesting encode/decode ordered, not compact, with checksum"
+    for _ in xrange(iterations):
+        n = random.getrandbits(1024)
+        s = int2bytes(n, endian='little')
+        r = encode(s, compact=False, checksum=True)
+        s = decode(r, compact=False, checksum=True)
+        m = bytes2int(s, endian='little')
+        assert n == m, (n, r, m)
+        print >>sys.stderr, '.',
+        sys.stderr.flush()
+
+    print >>sys.stderr, "\nTesting encode/decode ordered, compact, with checksum"
+    for _ in xrange(iterations):
+        n = random.getrandbits(1024)
+        s = int2bytes(n, endian='little')
+        r = encode(s, compact=True, checksum=True)
+        s = decode(r, compact=True, checksum=True)
+        m = bytes2int(s, endian='little')
+        assert n == m, (n, r, m)
+        print >>sys.stderr, '.',
+        sys.stderr.flush()
+
+    print >>sys.stderr, "\nTesting encode/decode ordered, not compact, without checksum"
+    for _ in xrange(iterations):
+        n = random.getrandbits(1024)
+        s = int2bytes(n, endian='little')
+        r = encode(s, compact=False, checksum=False)
+        s = decode(r, compact=False, checksum=False)
+        m = bytes2int(s, endian='little')
+        assert n == m, (n, r, m)
+        print >>sys.stderr, '.',
+        sys.stderr.flush()
+
+    print >>sys.stderr, "\nTesting encode/decode ordered, compact, without checksum"
+    for _ in xrange(iterations):
+        n = random.getrandbits(1024)
+        s = int2bytes(n, endian='little')
+        r = encode(s, compact=True, checksum=False)
+        s = decode(r, compact=True, checksum=False)
+        m = bytes2int(s, endian='little')
+        assert n == m, (n, r, m)
+        print >>sys.stderr, '.',
+        sys.stderr.flush()
+
+    print >>sys.stderr, "\nTesting encode/decode unordered, not compact, with checksum"
+    for _ in xrange(iterations):
+        n = random.getrandbits(1024)
+        s = int2bytes(n, endian='little')
+        r = list(encode_unordered(s, compact=False, checksum=True))
+        random.shuffle(r)
+        s = decode_unordered(r,compact=False, checksum=True)
+        m = bytes2int(s,endian='little')
+        assert n == m, (n, r, m)
+        print >>sys.stderr, '.',
+        sys.stderr.flush()
+
+    print >>sys.stderr, "\nTesting encode/decode unordered, compact, with checksum"
+    for _ in xrange(iterations):
+        n = random.getrandbits(1024)
+        s = int2bytes(n, endian='little')
+        r = list(encode_unordered(s, compact=True, checksum=True))
+        random.shuffle(r)
+        s = decode_unordered(r,compact=True, checksum=True)
+        m = bytes2int(s,endian='little')
+        assert n == m, (n, r, m)
+        print >>sys.stderr, '.',
+        sys.stderr.flush()
+
+    print >>sys.stderr, "\nTesting encode/decode unordered, not compact, without checksum"
+    for _ in xrange(iterations):
+        n = random.getrandbits(1024)
+        s = int2bytes(n, endian='little')
+        r = list(encode_unordered(s, compact=False, checksum=False))
+        random.shuffle(r)
+        s = decode_unordered(r,compact=False, checksum=False)
+        m = bytes2int(s,endian='little')
+        assert n == m, (n, r, m)
+        print >>sys.stderr, '.',
+        sys.stderr.flush()
+
+    print >>sys.stderr, "\nTesting encode/decode unordered, compact, without checksum"
+    for _ in xrange(iterations):
+        n = random.getrandbits(1024)
+        s = int2bytes(n, endian='little')
+        r = list(encode_unordered(s, compact=True, checksum=False))
+        random.shuffle(r)
+        s = decode_unordered(r,compact=True, checksum=False)
+        m = bytes2int(s,endian='little')
+        assert n == m, (n, r, m)
+        print >>sys.stderr, '.',
+        sys.stderr.flush()
+
+    print >>sys.stderr, "\nDone self testing"
