@@ -7,7 +7,7 @@ from intbytes import int2bytes, bytes2int
 from util import secure_compare
 
 def oaep_keccak(m, label='', out_len=None, hash_len=32, random=random, keccak_args=dict()):
-    """Perform OAEP (as specified by PKCS#1v2.1) with Keccak as the one-way function
+    """Perform OAEP (as specified by PKCS#1v2.1) with Keccak as the one-way function and mask-generating function
 
     All lengths specified in *bytes*
     m: message to be padded
@@ -59,7 +59,7 @@ def oaep_keccak(m, label='', out_len=None, hash_len=32, random=random, keccak_ar
     return '\x00' + masked_seed + masked
 
 def unoaep_keccak(m, label='', hash_len=32, keccak_args=dict()):
-    """Recover a message padded with OAEP (as specified by PKCS#1v2.1) with Keccak as the one-way function
+    """Recover a message padded with OAEP (as specified by PKCS#1v2.1) with Keccak as the one-way function and mask-generating function
 
     All lengths specified in *bytes*
     m: message to be decoded
