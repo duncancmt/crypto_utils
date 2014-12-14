@@ -73,7 +73,7 @@ def unoaep_keccak(m, label='', hash_len=32, keccak_args=dict()):
     lhash = k.squeeze(hash_len)
 
     # split the three parts of the OAEP'd message
-    Y, masked_seed, masked = m[0], m[1:hash_len+1], m[hash_len+1:]
+    leading_null, masked_seed, masked = m[0], m[1:hash_len+1], m[hash_len+1:]
 
     # recover rand_seed
     k = Keccak(**keccak_args)
@@ -91,27 +91,25 @@ def unoaep_keccak(m, label='', hash_len=32, keccak_args=dict()):
     padded = ''.join(imap(chr, imap(xor, imap(ord, masked),
                                          imap(ord, mask))))
 
-    # find the index of the '\x01' separator byte without leaking timing info
-    found_separator = False
-    separator_index = hash_len
-    tru = True
+    # find the '\x01' separator byte without leaking timing info
+    ## these need to be longs because of Python's small int caching
+    separator_index = 0L
+    separator = 0L
     for i in xrange(hash_len,len(padded)):
-        condition = (not found_separator) + (padded[i] != '\x00') == 2 # use + to avoid short-circuiting
-        if condition: 
-            separator_index = i
-            found_separator = tru
-        if not condition:
-            separator_index = separator_index
-            found_separator = found_separator
-            
-    lhash_, pad_string, separator, retval = padded[:hash_len], padded[hash_len:separator_index], \
-                                            padded[separator_index], padded[separator_index+1:]
+        # the result of ord is unavoidably a small int
+        char = ord(padded[i])
+        nonnull = int(char != 0)
+        # set separator and separator_index, but only if char is nonnull and
+        # they haven't already been set
+        separator |= -long(separator == 0) & -nonnull & char
+        separator_index |= -long(separator_index == 0) & -nonnull & i
 
-    # check that lhash matches, the separator is correct, and the leading NUL is preserved
-    # without leaking which one failed
-    if sum([ secure_compare(lhash, lhash_),
-             separator == '\x01',
-             Y == '\x00' ]) != 3:
+    # check that lhash matches, the separator is correct, and the leading NUL is
+    # preserved without leaking which one failed
+    if sum([ 0L, # force the sum to be a long
+             secure_compare(lhash, padded[:hash_len]),
+             separator == 1L,
+             leading_null == chr(0L) ]) != 3L:
         raise ValueError("Decryption failed")
     else:
-        return retval
+        return padded[separator_index+1:]
